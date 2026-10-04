@@ -6,6 +6,7 @@ import {
   commitHourHistogram,
   cumulativeCommits,
   deepCommitCount,
+  deepCommitMeta,
   languageStarWeighted,
   longestGapDays,
   namespaceStats,
@@ -226,5 +227,20 @@ describe('deep commits helpers', () => {
     expect(hist.reduce((s, v) => s + v, 0)).toBe(3)
     expect(deepCommitCount(commits)).toBe(3)
     expect(deepCommitCount(undefined)).toBe(0)
+  })
+
+  it('元信息：只计非空仓库，取最早/最晚作者时间', () => {
+    const withEmpty: Record<string, DeepCommitLite[]> = {
+      ...commits,
+      'a/empty-repo': [], // 空仓库不计入覆盖数
+    }
+    const meta = deepCommitMeta(withEmpty)
+    expect(meta).toEqual({
+      total: 3,
+      repos: 2,
+      first: '2026-02-03T09:00:00+08:00',
+      last: '2026-02-05T09:30:00+08:00',
+    })
+    expect(deepCommitMeta(undefined)).toEqual({ total: 0, repos: 0, first: null, last: null })
   })
 })

@@ -646,3 +646,32 @@ export function deepCommitCount(
   if (!commitsByRepo) return 0
   return Object.values(commitsByRepo).reduce((s, list) => s + list.length, 0)
 }
+
+export interface DeepCommitMeta {
+  /** 提交样本总数 */
+  total: number
+  /** 有提交样本的仓库数 */
+  repos: number
+  /** 最早/最晚作者时间（ISO） */
+  first: string | null
+  last: string | null
+}
+
+/** 深度抓取提交的元信息（展示用） */
+export function deepCommitMeta(
+  commitsByRepo: Record<string, DeepCommitLite[]> | undefined,
+): DeepCommitMeta {
+  const meta: DeepCommitMeta = { total: 0, repos: 0, first: null, last: null }
+  if (!commitsByRepo) return meta
+  for (const list of Object.values(commitsByRepo)) {
+    if (list.length === 0) continue
+    meta.repos += 1
+    meta.total += list.length
+    for (const c of list) {
+      if (!c.date) continue
+      if (!meta.first || c.date < meta.first) meta.first = c.date
+      if (!meta.last || c.date > meta.last) meta.last = c.date
+    }
+  }
+  return meta
+}

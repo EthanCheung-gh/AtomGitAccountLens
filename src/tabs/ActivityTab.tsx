@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { EChartsOption } from 'echarts'
+import DeepCrawlAnalysis from '../components/DeepCrawlAnalysis'
 import DeepCrawlControls from '../components/DeepCrawlControls'
 import EChart from '../components/EChart'
 import EmptyState from '../components/EmptyState'
@@ -8,9 +9,7 @@ import StatCard from '../components/StatCard'
 import { useAppStore } from '../state/AppStore'
 import {
   actionBreakdown,
-  commitHourHistogram,
   cumulativeCommits,
-  deepCommitCount,
   pushSizeStats,
   repoMonthlyStack,
   summarizeEvents,
@@ -31,7 +30,7 @@ function truncate(name: string, max = 26): string {
 }
 
 export default function ActivityTab() {
-  const { snapshot, crawl, startCrawl, eventFetch, fetchYear, deepCrawl } = useAppStore()
+  const { snapshot, crawl, startCrawl, eventFetch, fetchYear } = useAppStore()
   const [year, setYear] = useState<number>(currentYear())
 
   const years = useMemo<number[]>(() => {
@@ -315,41 +314,6 @@ export default function ActivityTab() {
     [monthlyStack],
   )
 
-  const deepHist = useMemo(
-    () => commitHourHistogram(snapshot?.commitsRecentByRepo),
-    [snapshot],
-  )
-  const deepTotal = useMemo(
-    () => deepCommitCount(snapshot?.commitsRecentByRepo),
-    [snapshot],
-  )
-  const deepHourOption = useMemo<EChartsOption>(
-    () => ({
-      tooltip: { ...TOOLTIP_STYLE, trigger: 'axis' },
-      grid: { left: 40, right: 12, top: 18, bottom: 26 },
-      xAxis: {
-        type: 'category',
-        data: Array.from({ length: 24 }, (_, h) => `${h}时`),
-        axisLabel: { color: AXIS_COLOR, interval: 2, fontSize: 11 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
-        axisTick: { show: false },
-      },
-      yAxis: {
-        type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
-      },
-      series: [
-        {
-          type: 'bar',
-          data: deepHist,
-          itemStyle: { color: '#39c5cf', borderRadius: [3, 3, 0, 0] },
-        },
-      ],
-    }),
-    [deepHist],
-  )
-
   if (!snapshot) {
     return (
       <EmptyState
@@ -404,6 +368,7 @@ export default function ActivityTab() {
           <div className="card chart-card">
             <h3>深度抓取（提交级分析，不依赖动态权限）</h3>
             <DeepCrawlControls />
+            <DeepCrawlAnalysis />
           </div>
         </>
       ) : unavailable === 'error' ? (
@@ -412,6 +377,7 @@ export default function ActivityTab() {
           <div className="card chart-card">
             <h3>深度抓取（提交级分析，不依赖动态权限）</h3>
             <DeepCrawlControls />
+            <DeepCrawlAnalysis />
           </div>
         </>
       ) : !events || events.length === 0 ? (
@@ -423,6 +389,7 @@ export default function ActivityTab() {
             <div className="card chart-card">
               <h3>深度抓取（提交级分析，不依赖动态权限）</h3>
               <DeepCrawlControls />
+              <DeepCrawlAnalysis />
             </div>
           </>
         )
@@ -472,22 +439,9 @@ export default function ActivityTab() {
               <EChart option={pushOption} height={230} />
             </div>
             <div className="card chart-card">
-              <h3>
-                提交级时段（深度抓取{deepTotal > 0 ? ` · ${formatCount(deepTotal)} 条提交样本` : ''}）
-              </h3>
-              {deepCrawl.kind !== 'running' && deepTotal > 0 ? (
-                <>
-                  <EChart option={deepHourOption} height={230} />
-                  <p className="muted">按提交的作者时间（比推送时间更精确），每仓库最近 100 条。</p>
-                </>
-              ) : (
-                <>
-                  <p className="muted">
-                    深度抓取每仓库最近 100 条提交（每仓库 1 次请求，走限流队列），可按提交作者时间精确分析时段。
-                  </p>
-                  <DeepCrawlControls />
-                </>
-              )}
+              <h3>提交级时段（深度抓取）</h3>
+              <DeepCrawlControls />
+              <DeepCrawlAnalysis />
             </div>
           </div>
 

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { EChartsOption } from 'echarts'
+import DeepCrawlAnalysis from '../components/DeepCrawlAnalysis'
 import DeepCrawlControls from '../components/DeepCrawlControls'
 import EChart from '../components/EChart'
 import EmptyState from '../components/EmptyState'
@@ -367,6 +368,7 @@ export default function ReposTab() {
           </button>
         </div>
         <DeepCrawlControls />
+        <DeepCrawlAnalysis />
       </div>
 
       <div className="repos-toolbar">

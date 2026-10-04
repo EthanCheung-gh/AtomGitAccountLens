@@ -37,7 +37,7 @@ export interface EventFetchState {
 export type DeepCrawlState =
   | { kind: 'idle' }
   | { kind: 'running'; current: number; total: number; message: string }
-  | { kind: 'done'; at: string; fetched: number }
+  | { kind: 'done'; at: string; fetched: number; failed: number }
   | { kind: 'error'; message: string }
   | { kind: 'aborted' }
 
@@ -219,7 +219,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     const snap = snapshotRef.current
     if (!snap || !token) return
     if (deepKindRef.current === 'running') return
-    const skip = new Set(Object.keys(snap.commitsRecentByRepo ?? {}))
+    // 增量：只跳过已拿到提交样本的仓库；空结果（失败/空仓库）可重试
+    const skip = new Set(
+      Object.entries(snap.commitsRecentByRepo ?? {})
+        .filter(([, list]) => list.length > 0)
+        .map(([path]) => path),
+    )
     const controller = new AbortController()
     deepAbortRef.current = controller
     setDeepCrawl({ kind: 'running', current: 0, total: 0, message: '准备深度抓取…' })
@@ -246,6 +251,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           kind: 'done',
           at: new Date().toISOString(),
           fetched: Object.keys(result.commitsByRepo).length,
+          failed: result.failedCount,
         })
       })
       .catch((err: unknown) => {

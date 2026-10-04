@@ -74,6 +74,12 @@ export default function DeepCrawlControls() {
       {deepCrawl.kind === 'error' && (
         <p className="token-error">深度抓取失败：{deepCrawl.message}</p>
       )}
+      {deepCrawl.kind === 'done' && deepCrawl.failed > 0 && (
+        <p className="token-error">
+          上次深度抓取有 {deepCrawl.failed} 个仓库拉取失败（多为空仓库或令牌缺少项目读取权限），
+          空结果不会计入增量，再次点击可重试。
+        </p>
+      )}
     </>
   )
 }
