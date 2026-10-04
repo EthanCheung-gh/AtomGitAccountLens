@@ -833,6 +833,16 @@ code {
   min-width: 200px;
 }
 
+.deep-scope-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .deep-crawl-msg {
   margin: 0 0 8px;
 }

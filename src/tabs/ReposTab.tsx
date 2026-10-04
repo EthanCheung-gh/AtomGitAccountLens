@@ -41,6 +41,8 @@ export default function ReposTab() {
     deepCrawl,
     startDeepCrawl,
     abortDeepCrawl,
+    deepScope,
+    setDeepScope,
   } = useAppStore()
   const [query, setQuery] = useState('')
   const [calibre, setCalibre] = useState<LangCalibre>('repo')
@@ -396,15 +398,28 @@ export default function ReposTab() {
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            className="btn"
-            onClick={startDeepCrawl}
-            disabled={crawl.kind === 'running'}
-            title="逐仓库拉取最近 100 条提交（走限流队列，可中断，增量续抓）"
-          >
-            {deepTotal > 0 ? `深度抓取（已 ${formatCount(deepTotal)} 条）` : '深度抓取提交'}
-          </button>
+          <>
+            <label
+              className="deep-scope-check"
+              title="默认只抓 namespace 为本人的仓库；勾选后也抓你加入的社区/组织仓库（其中他人的提交会混入提交级时段分析）"
+            >
+              <input
+                type="checkbox"
+                checked={deepScope === 'all'}
+                onChange={(e) => setDeepScope(e.target.checked ? 'all' : 'personal')}
+              />
+              含社区/组织仓库
+            </label>
+            <button
+              type="button"
+              className="btn"
+              onClick={startDeepCrawl}
+              disabled={crawl.kind === 'running'}
+              title="逐仓库拉取最近 100 条提交（走限流队列，可中断，增量续抓）"
+            >
+              {deepTotal > 0 ? `深度抓取（已 ${formatCount(deepTotal)} 条）` : '深度抓取提交'}
+            </button>
+          </>
         )}
       </div>
 

@@ -31,7 +31,18 @@ function truncate(name: string, max = 26): string {
 }
 
 export default function ActivityTab() {
-  const { snapshot, crawl, startCrawl, eventFetch, fetchYear, deepCrawl, startDeepCrawl, abortDeepCrawl } = useAppStore()
+  const {
+    snapshot,
+    crawl,
+    startCrawl,
+    eventFetch,
+    fetchYear,
+    deepCrawl,
+    startDeepCrawl,
+    abortDeepCrawl,
+    deepScope,
+    setDeepScope,
+  } = useAppStore()
   const [year, setYear] = useState<number>(currentYear())
 
   const years = useMemo<number[]>(() => {
@@ -475,6 +486,17 @@ export default function ActivityTab() {
                   <p className="muted">
                     深度抓取每仓库最近 100 条提交（每仓库 1 次请求，走限流队列），可按提交作者时间精确分析时段。
                   </p>
+                  <label
+                    className="deep-scope-check"
+                    title="默认只抓 namespace 为本人的仓库；勾选后也抓你加入的社区/组织仓库（其中他人的提交会混入时段分析）"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={deepScope === 'all'}
+                      onChange={(e) => setDeepScope(e.target.checked ? 'all' : 'personal')}
+                    />
+                    含我加入的社区/组织仓库
+                  </label>
                   {deepCrawl.kind === 'error' && (
                     <p className="token-error">深度抓取失败：{deepCrawl.message}</p>
                   )}

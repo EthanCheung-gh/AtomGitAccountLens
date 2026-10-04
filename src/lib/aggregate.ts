@@ -553,6 +553,11 @@ function nsOf(path: string): string {
   return idx > 0 ? path.slice(0, idx) : path || '(未知)'
 }
 
+/** 仓库归属命名空间（owner 段，小写比较用） */
+export function repoNamespace(path: string): string {
+  return nsOf(path)
+}
+
 /** 个人/组织（命名空间）分组：仓库数、Star、年度提交（来自事件流前缀匹配） */
 export function namespaceStats(
   repos: GitCodeRepo[],

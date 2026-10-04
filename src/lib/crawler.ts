@@ -11,7 +11,7 @@ import type {
   GitCodeUser,
   RawGitCodeEvent,
 } from '../api/types'
-import { repoOwnerName, repoPath } from './aggregate'
+import { repoNamespace, repoOwnerName, repoPath } from './aggregate'
 
 export type CrawlPhase = 'repos' | 'languages' | 'events'
 
@@ -178,24 +178,37 @@ export interface DeepCrawlResult {
   failedCount: number
 }
 
+/** 深度抓取范围：personal = 仅本人命名空间仓库；all = 含加入的社区/组织仓库 */
+export type DeepCrawlScope = 'personal' | 'all'
+
 /**
  * 深度抓取：逐仓库拉最近 100 条提交（每仓库 1 次请求）。
- * skip 中的仓库不再重复拉（增量）；404/私有受限仓库记空表继续。
+ * - skip 中的仓库不再重复拉（增量）；404/私有受限仓库记空表继续
+ * - scope='personal' 时只抓 namespace === login 的本人仓库，
+ *   排除加入的社区/组织仓库（其中的他人提交会污染作者时段分析）
  */
 export async function deepCrawlCommits(
   client: GitCodeClient,
   repos: GitCodeRepo[],
   opts: {
     skip?: Set<string>
+    scope?: DeepCrawlScope
+    login?: string
     onProgress?: (p: CrawlProgress) => void
     signal?: AbortSignal
   } = {},
 ): Promise<DeepCrawlResult> {
   const { onProgress, signal } = opts
   const skip = opts.skip ?? new Set<string>()
+  const scope = opts.scope ?? 'all'
+  const loginLower = opts.login?.toLowerCase() ?? null
   const targets = repos.filter((r) => {
     const path = repoPath(r)
-    return path !== '' && !skip.has(path) && repoOwnerName(r) !== null
+    if (path === '' || skip.has(path) || repoOwnerName(r) === null) return false
+    if (scope === 'personal' && loginLower) {
+      return repoNamespace(path).toLowerCase() === loginLower
+    }
+    return true
   })
   const commitsByRepo: Record<string, DeepCommitLite[]> = {}
   let failedCount = 0

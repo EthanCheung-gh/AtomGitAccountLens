@@ -11,7 +11,7 @@ import type { ReactNode } from 'react'
 import { GitCodeClient, apiErrorMessage, isApiError } from '../api/client'
 import type { GitCodeUser } from '../api/types'
 import { crawlAccount, deepCrawlCommits, fetchEventsYear } from '../lib/crawler'
-import type { CrawlProgress } from '../lib/crawler'
+import type { CrawlProgress, DeepCrawlScope } from '../lib/crawler'
 import {
   AnalysisSnapshot,
   clearRememberedToken,
@@ -66,6 +66,9 @@ export interface AppStoreValue {
   /** 深度抓取最近提交（增量：已抓过的仓库跳过） */
   startDeepCrawl(): void
   abortDeepCrawl(): void
+  /** 深度抓取范围偏好：personal=仅本人命名空间（默认），all=含加入的社区/组织仓库 */
+  deepScope: DeepCrawlScope
+  setDeepScope(scope: DeepCrawlScope): void
 }
 
 const AppStoreContext = createContext<AppStoreValue | null>(null)
@@ -86,16 +89,19 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [crawl, setCrawl] = useState<CrawlState>({ kind: 'idle' })
   const [eventFetch, setEventFetch] = useState<EventFetchState | null>(null)
   const [deepCrawl, setDeepCrawl] = useState<DeepCrawlState>({ kind: 'idle' })
+  const [deepScope, setDeepScope] = useState<DeepCrawlScope>('personal')
 
   const clientRef = useRef<{ token: string; client: GitCodeClient } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const deepAbortRef = useRef<AbortController | null>(null)
   const deepKindRef = useRef<DeepCrawlState['kind']>('idle')
+  const deepScopeRef = useRef<DeepCrawlScope>('personal')
   const crawlKindRef = useRef<CrawlState['kind']>('idle')
   const snapshotRef = useRef<AnalysisSnapshot | null>(null)
 
   crawlKindRef.current = crawl.kind
   deepKindRef.current = deepCrawl.kind
+  deepScopeRef.current = deepScope
   snapshotRef.current = snapshot
 
   const getClient = useCallback((): GitCodeClient => {
@@ -219,6 +225,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setDeepCrawl({ kind: 'running', current: 0, total: 0, message: '准备深度抓取…' })
     deepCrawlCommits(getClient(), snap.repos, {
       skip,
+      scope: deepScopeRef.current,
+      login: snap.login,
       signal: controller.signal,
       onProgress: ({ current, total, message }) =>
         setDeepCrawl({ kind: 'running', current, total, message }),
@@ -251,6 +259,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   const abortDeepCrawl = useCallback(() => {
     deepAbortRef.current?.abort()
+  }, [])
+
+  const setDeepScopeWithRef = useCallback((scope: DeepCrawlScope) => {
+    deepScopeRef.current = scope
+    setDeepScope(scope)
   }, [])
 
   const signIn = useCallback(
@@ -349,6 +362,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       fetchYear,
       startDeepCrawl,
       abortDeepCrawl,
+      deepScope,
+      setDeepScope: setDeepScopeWithRef,
     }),
     [
       token,
@@ -369,6 +384,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       fetchYear,
       startDeepCrawl,
       abortDeepCrawl,
+      deepScope,
+      setDeepScopeWithRef,
     ],
   )
 
