@@ -1,8 +1,18 @@
 import { useMemo, useState } from 'react'
+import type { EChartsOption } from 'echarts'
+import EChart from '../components/EChart'
 import EmptyState from '../components/EmptyState'
 import { useAppStore } from '../state/AppStore'
-import { repoMajorLanguage, repoMetrics, repoPath } from '../lib/aggregate'
+import {
+  aggregateLanguages,
+  repoMajorLanguage,
+  repoMetrics,
+  repoPath,
+} from '../lib/aggregate'
 import { formatCount, formatDate } from '../lib/format'
+
+const AXIS_COLOR = '#8b949e'
+const SPLIT_LINE = '#21262d'
 
 export default function ReposTab() {
   const { snapshot, crawl, startCrawl, toggleExclude } = useAppStore()
@@ -29,6 +39,47 @@ export default function ReposTab() {
     const metrics = repoMetrics(snapshot.repos, snapshot.excludedRepos)
     return { rows, metrics }
   }, [snapshot])
+
+  const languages = useMemo(() => {
+    if (!snapshot) return []
+    return aggregateLanguages(
+      snapshot.repos,
+      snapshot.languagesByRepo,
+      snapshot.excludedRepos,
+    ).slice(0, 10)
+  }, [snapshot])
+
+  const langOption = useMemo<EChartsOption>(() => {
+    const top = languages.slice(0, 10)
+    return {
+      tooltip: {
+        backgroundColor: '#161b22',
+        borderColor: '#30363d',
+        textStyle: { color: '#e6edf3' },
+      },
+      grid: { left: 8, right: 48, top: 8, bottom: 8, containLabel: true },
+      xAxis: {
+        type: 'value',
+        axisLabel: { color: AXIS_COLOR, fontSize: 11, formatter: '{value}%' },
+        splitLine: { lineStyle: { color: SPLIT_LINE } },
+      },
+      yAxis: {
+        type: 'category',
+        data: top.map((l) => `${l.language}（${l.repoCount} 仓）`).reverse(),
+        axisLabel: { color: '#e6edf3', fontSize: 12 },
+        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisTick: { show: false },
+      },
+      series: [
+        {
+          type: 'bar',
+          data: top.map((l) => Number(l.percent.toFixed(1))).reverse(),
+          itemStyle: { color: '#58a6ff', borderRadius: [0, 3, 3, 0] },
+          label: { show: true, position: 'right', color: AXIS_COLOR, fontSize: 11 },
+        },
+      ],
+    }
+  }, [languages])
 
   if (!snapshot) {
     return (
@@ -57,6 +108,17 @@ export default function ReposTab() {
 
   return (
     <section className="repos-tab">
+      {languages.length > 0 && (
+        <div className="card repos-lang-card">
+          <h3>账号语言构成（计入统计的仓库）</h3>
+          <EChart option={langOption} height={Math.max(160, languages.length * 28 + 50)} />
+          <p className="muted">
+            口径：GitCode 语言接口返回仓库内各语言百分比（非代码行数），此处为各仓库百分比按仓库数加权的账号级占比；
+            括号内为主语言为该语言的仓库数。勾选/取消仓库即时重算。
+          </p>
+        </div>
+      )}
+
       <div className="repos-toolbar">
         <div className="repos-toolbar-info">
           <strong>{metrics.total}</strong> 个仓库 · 排除 <strong>{metrics.excluded}</strong> ·
