@@ -206,6 +206,150 @@ input.input:focus {
   font-size: 12px;
 }
 
+a {
+  color: var(--accent);
+}
+
+code {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12px;
+}
+
+/* ---------- user chip ---------- */
+.header-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px 6px 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.user-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.user-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-2);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.user-login {
+  font-size: 13px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.link-btn:hover {
+  color: var(--danger);
+}
+
+/* ---------- token gate ---------- */
+.token-gate {
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+.token-card {
+  width: 100%;
+  max-width: 560px;
+  padding: 26px 28px;
+}
+
+.token-card h2 {
+  margin: 0 0 14px;
+  font-size: 18px;
+}
+
+.token-step {
+  margin: 6px 0;
+  line-height: 1.7;
+}
+
+.token-input-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.token-input-row .input {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.token-remember {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 14px 0 4px;
+  font-size: 13px;
+  cursor: pointer;
+  line-height: 1.6;
+}
+
+.token-remember input {
+  margin-top: 3px;
+}
+
+.token-error {
+  margin: 12px 0 0;
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.token-submit {
+  width: 100%;
+  margin-top: 16px;
+  padding: 11px;
+  font-size: 14px;
+}
+
+.token-privacy {
+  margin: 16px 0 0;
+  line-height: 1.7;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
 /* ---------- responsive ---------- */
 @media (max-width: 640px) {
   .app {
