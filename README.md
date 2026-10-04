@@ -1,0 +1,64 @@
+# AtomGitAccountLens
+
+[![CI](https://github.com/EthanCheung-gh/AtomGitAccountLens/actions/workflows/ci.yml/badge.svg)](https://github.com/EthanCheung-gh/AtomGitAccountLens/actions/workflows/ci.yml)
+[![Deploy](https://github.com/EthanCheung-gh/AtomGitAccountLens/actions/workflows/deploy.yml/badge.svg)](https://github.com/EthanCheung-gh/AtomGitAccountLens/actions/workflows/deploy.yml)
+
+**GitCode / AtomGit 账号全景透镜**：输入你的访问令牌（PAT），在浏览器本地对你的仓库、语言、提交与活跃度做全面可视化分析。纯前端静态站，无后端，数据不出本机。
+
+在线体验：`https://ethancheung-gh.github.io/AtomGitAccountLens/`
+
+## 功能
+
+- **总览**：账号资料、仓库/Star/Fork/活跃仓库聚合、`top_languages`、年度提交规模
+- **仓库画像**：语言构成（加权口径）、仓库清单勾选排除，勾选即时重算全站口径
+- **活跃度**：年度贡献热力图（按日提交）、24 小时活跃时段、按月提交趋势、最活跃仓库 Top 10
+- **年度报告**：自然年选择器，生成可整页截图分享的年度总结（提交数、活跃天数、最长连续、语言构成等）
+
+工程特性：
+
+- 串行限流队列（默认 300 次/分，低于平台 400 次/分配额），429/5xx 指数退避重试，全程可中断
+- 分析结果快照存于 localStorage：刷新秒开，手动「重新抓取」更新
+- 缺 `read_user` 等权限时显示权限引导而非报错白屏
+- Vitest 单测覆盖限流、聚合口径与存储等核心纯逻辑，GitHub Actions CI
+
+## 隐私与令牌
+
+- 令牌仅保存在页面内存中；勾选「在本设备记住」才会写入本浏览器 localStorage（明文，公共设备勿勾选）
+- 所有请求直连 `api.gitcode.com/api/v5` 官方接口（`Authorization: Bearer`），不经过任何第三方服务器
+- 分析结果快照仅保存在你的浏览器，清除浏览器数据即彻底删除
+
+令牌创建入口：<https://gitcode.com/setting/token-classic>（建议勾选 `read_user` 等读取权限）
+
+## 统计口径（重要）
+
+GitCode 开放 API 与 GitHub 存在差异，本项目坚持「不虚构数据」：
+
+1. **语言占比为加权口径**：`/repos/{owner}/{repo}/languages` 返回的是仓库内各语言**百分比**（非字节/行数）。账号级语言占比 = 各仓库百分比的加权和 ÷ 总权重；括号内「N 仓」表示以该语言为主语言的仓库数（主语言优先取仓库 `language` 字段，缺失时取语言表最高项）。
+2. **不展示代码行数**：API 不提供行数数据，规模指标以仓库数、提交数为代理。
+3. **提交数来自事件流**：`/users/{login}/events?year=`（需 `read_user` 权限），热力图/时段/趋势/年报与总览的年度提交数同源。
+4. **Followers 仅计数**：`/user` 返回的计数字段（followers 列表端点在 GitCode 域不可用）。
+5. **仓库排除**：仓库画像页勾选排除后，总览/活跃度/年度报告全部同步按排除后口径计算。
+
+## GitCode 与 AtomGit
+
+GitCode（gitcode.com）与 AtomGit（atomgit.com）已完成平台融合，账户与 API 后端同源，`api.atomgit.com/api/v5` 同样可用。本项目固定使用 `api.gitcode.com`，你的账号在两个域名下均可登录使用本站。
+
+## 技术栈
+
+React 18 + TypeScript + Vite + ECharts，pnpm 管理依赖。
+
+## 本地开发
+
+```bash
+pnpm install
+pnpm dev       # 开发服务器
+pnpm build     # 类型检查 + 生产构建
+pnpm test      # 单元测试
+pnpm preview   # 预览构建产物
+```
+
+推送到 `main` 后 GitHub Actions 自动构建并发布到 GitHub Pages（`.github/workflows/deploy.yml`）。
+
+## 许可
+
+暂未声明开源许可（个人作品集项目）。
