@@ -656,6 +656,140 @@ code {
   margin-top: 0;
 }
 
+/* ---------- report tab ---------- */
+.report-hero {
+  background: linear-gradient(135deg, #101725 0%, #14213a 55%, #0f2a1d 100%);
+  border: 1px solid rgba(88, 166, 255, 0.35);
+  border-radius: 14px;
+  padding: 26px 28px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow);
+}
+
+.report-hero-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.report-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(88, 166, 255, 0.5);
+}
+
+.report-year-label {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 4px;
+  color: var(--accent);
+}
+
+.report-hero-head h2 {
+  margin: 4px 0 0;
+  font-size: 22px;
+}
+
+.report-hero-numbers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 14px;
+}
+
+.report-hero-numbers > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.report-hero-numbers strong {
+  font-size: 30px;
+  font-weight: 800;
+  color: #79c0ff;
+}
+
+.report-hero-numbers span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.report-hero-range {
+  margin: 18px 0 0;
+}
+
+.report-card {
+  margin-bottom: 14px;
+}
+
+.report-facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.report-facts strong {
+  color: #79c0ff;
+}
+
+.report-top-repos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: repo-rank;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.report-top-repos li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  counter-increment: repo-rank;
+}
+
+.report-top-repos li::before {
+  content: counter(repo-rank);
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.report-repo-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-repo-commits {
+  flex: none;
+  color: var(--muted);
+}
+
+.report-calibre {
+  margin: 10px 0 0;
+  line-height: 1.7;
+}
+
 /* ---------- repos tab ---------- */
 .repos-toolbar {
   display: flex;

@@ -214,3 +214,40 @@ export function repoMajorLanguage(
   if (entries.length === 0) return null
   return entries.reduce((a, b) => (b[1] > a[1] ? b : a))[0]
 }
+
+/** 最长连续活跃天数（commitsByDate 中提交数 > 0 的日期连成最长一段） */
+export function longestStreak(commitsByDate: Record<string, number>): number {
+  const days = Object.keys(commitsByDate)
+    .filter((d) => commitsByDate[d] > 0 && /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .sort()
+  let best = 0
+  let run = 0
+  let prev: number | null = null
+  const DAY_MS = 86_400_000
+  for (const d of days) {
+    const t = Date.parse(`${d}T00:00:00Z`)
+    if (Number.isNaN(t)) continue
+    run = prev !== null && t - prev === DAY_MS ? run + 1 : 1
+    if (run > best) best = run
+    prev = t
+  }
+  return best
+}
+
+/** 峰值下标（并列取最先；全 0 返回 0） */
+export function peakIndex(arr: readonly number[]): number {
+  let idx = 0
+  for (let i = 1; i < arr.length; i++) {
+    if (arr[i] > arr[idx]) idx = i
+  }
+  return idx
+}
+
+/** 单日最高提交数 */
+export function maxDailyCommits(commitsByDate: Record<string, number>): number {
+  let max = 0
+  for (const v of Object.values(commitsByDate)) {
+    if (v > max) max = v
+  }
+  return max
+}
