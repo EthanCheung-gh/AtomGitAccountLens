@@ -9,10 +9,11 @@ Live site: `https://ethancheung-gh.github.io/AtomGitAccountLens/`
 
 ## Features
 
-- **Overview**: profile, repo/star/fork/active-repo aggregates, `top_languages`, annual commit scale
-- **Repo Portrait**: weighted language composition, per-repo exclusion checkboxes that instantly re-compute every statistic site-wide
-- **Activity**: yearly contribution heatmap (daily commits), 24-hour distribution, monthly trend, top-10 most active repos
-- **Annual Report**: natural-year selector producing a screenshot-shareable yearly summary (commits, active days, longest streak, language mix)
+- **Overview**: profile, repo/star/fork/watcher/active-repo aggregates, `top_languages`, annual commit scale
+- **Repo Portrait**: language composition with dual calibre (repo-weighted vs star-weighted toggle), repo creation timeline, freshness buckets (30d/6m/1y/dormant), top stargazed repos, personal/org namespace breakdown, per-repo exclusion checkboxes that instantly re-compute every statistic site-wide
+- **Activity**: yearly contribution heatmap (daily commits), 7×24 work-habit heatmap (weekday × hour), event-type breakdown, cumulative commit curve, push-size distribution (commits per push), monthly stacked repo activity, top-10 most active repos
+- **Annual Report**: natural-year selector producing a screenshot-shareable yearly summary (commits, active days, longest streak and longest gap, push habits, language mix)
+- **Deep crawl (optional)**: per-repo recent 100 commits through the rate-limited queue (abortable, incremental) for author-time-accurate hour analysis
 
 Engineering:
 
@@ -33,7 +34,7 @@ Token creation: <https://gitcode.com/setting/token-classic> (tick read scopes su
 
 GitCode's API differs from GitHub's; this project refuses to fabricate numbers:
 
-1. **Weighted language share**: `/repos/{owner}/{repo}/languages` returns per-language **percentages** within each repo (not bytes/lines). The account-level share is the sum of per-repo percentages divided by the total weight; "N repos" counts repos whose primary language it is (primary language prefers the repo `language` field, falling back to the highest entry in the language table).
+1. **Weighted language share**: `/repos/{owner}/{repo}/languages` returns per-language **percentages** within each repo (not bytes/lines). Two calibres are offered: **repo-weighted** (sum of per-repo percentages over total weight) and **star-weighted** (percentage × max(1, repo stars)); "N repos" counts repos whose primary language it is (primary language prefers the repo `language` field, falling back to the highest entry in the language table).
 2. **No lines-of-code**: the API provides none, so repo and commit counts proxy scale.
 3. **Commits come from the events feed**: `/users/{login}/events?year=` (needs `read_user`); heatmap/hours/trend/report and the overview all share this source.
 4. **Followers are counts only** (the followers-list endpoint is unavailable on the GitCode host).

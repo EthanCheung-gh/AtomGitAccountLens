@@ -6,9 +6,11 @@ import ScopeGuide from '../components/ScopeGuide'
 import { useAppStore } from '../state/AppStore'
 import {
   aggregateLanguages,
+  longestGapDays,
   longestStreak,
   maxDailyCommits,
   peakIndex,
+  pushSizeStats,
   repoMetrics,
   summarizeEvents,
 } from '../lib/aggregate'
@@ -115,6 +117,8 @@ export default function ReportTab() {
   const peakHour = peakIndex(summary.eventsByHour)
   const streak = longestStreak(summary.commitsByDate)
   const maxDaily = maxDailyCommits(summary.commitsByDate)
+  const gap = longestGapDays(summary.commitsByDate)
+  const pushSizes = pushSizeStats(events ?? [])
 
   return (
     <section className="report-tab">
@@ -195,6 +199,14 @@ export default function ReportTab() {
                 <li>
                   高产时段在 <strong>{peakHour} 点</strong>前后
                   （{formatCount(summary.eventsByHour[peakHour])} 次动态）
+                </li>
+                <li>
+                  提交习惯：平均每次推送 <strong>{pushSizes.avg}</strong> 个提交，
+                  单次最多 <strong>{pushSizes.max}</strong> 个
+                </li>
+                <li>
+                  最长连续活跃 <strong>{streak}</strong> 天，
+                  最长空窗 <strong>{gap}</strong> 天
                 </li>
                 <li>
                   全年 <strong>{formatCount(summary.totalEvents)}</strong> 次动态，

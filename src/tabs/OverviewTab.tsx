@@ -17,7 +17,15 @@ export default function OverviewTab() {
     const events = snapshot.eventsByYear[yearKey] ?? []
     const summary = summarizeEvents(events)
     const eventsState = snapshot.eventsUnavailable?.[yearKey]
-    return { year, metrics, summary, eventsState }
+    const excludedSet = new Set(snapshot.excludedRepos)
+    const watchers = snapshot.repos.reduce(
+      (sum, r) =>
+        r.path_with_namespace && excludedSet.has(r.path_with_namespace)
+          ? sum
+          : sum + (r.watchers_count ?? 0),
+      0,
+    )
+    return { year, metrics, summary, eventsState, watchers }
   }, [snapshot])
 
   if (!snapshot) {
@@ -40,7 +48,7 @@ export default function OverviewTab() {
   }
 
   const { user } = snapshot
-  const { metrics, summary, eventsState, year } = view!
+  const { metrics, summary, eventsState, year, watchers } = view!
   const topLanguages = (user.top_languages ?? []).filter(Boolean).slice(0, 8)
 
   return (
@@ -83,6 +91,7 @@ export default function OverviewTab() {
           <StatCard label="计入统计的仓库" value={metrics.included} hint={`共 ${metrics.total} 个，排除 ${metrics.excluded} 个`} />
           <StatCard label="累计 Star" value={formatCount(metrics.stars)} />
           <StatCard label="累计 Fork" value={formatCount(metrics.forks)} hint={`Fork 来的仓库 ${metrics.forkedCount} 个`} />
+          <StatCard label="累计 Watchers" value={formatCount(watchers)} />
           <StatCard label="近一年活跃仓库" value={metrics.activeCount} hint="365 天内有 push" />
           <StatCard label="Followers" value={formatCount(user.followers)} />
           <StatCard label="Following" value={formatCount(user.following)} />
