@@ -605,6 +605,57 @@ code {
   margin: 0;
 }
 
+/* ---------- activity tab ---------- */
+.activity-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.activity-year-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.activity-year {
+  width: 110px;
+}
+
+.activity-stats {
+  margin-bottom: 14px;
+}
+
+.activity-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--danger);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 900px) {
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart-card {
+  margin-bottom: 14px;
+}
+
+.chart-card .activity-toolbar + & {
+  margin-top: 0;
+}
+
 /* ---------- repos tab ---------- */
 .repos-toolbar {
   display: flex;

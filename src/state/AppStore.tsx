@@ -10,7 +10,7 @@ import {
 import type { ReactNode } from 'react'
 import { GitCodeClient, apiErrorMessage, isApiError } from '../api/client'
 import type { GitCodeUser } from '../api/types'
-import { crawlAccount } from '../lib/crawler'
+import { crawlAccount, fetchEventsYear } from '../lib/crawler'
 import type { CrawlProgress } from '../lib/crawler'
 import {
   AnalysisSnapshot,
@@ -29,6 +29,11 @@ export type CrawlState =
   | { kind: 'error'; message: string }
   | { kind: 'aborted' }
 
+export interface EventFetchState {
+  year: number
+  error: string | null
+}
+
 export interface AppStoreValue {
   token: string | null
   user: GitCodeUser | null
@@ -39,12 +44,16 @@ export interface AppStoreValue {
   /** 快照写入 localStorage 失败（配额/隐私模式）时为 true */
   snapshotSaveFailed: boolean
   crawl: CrawlState
+  /** 某年度事件正在拉取/失败（年选择器触发的增量抓取） */
+  eventFetch: EventFetchState | null
   signIn(token: string, remember: boolean): Promise<GitCodeUser>
   signOut(): void
   getClient(): GitCodeClient
   startCrawl(): void
   abortCrawl(): void
   toggleExclude(repoPath: string): void
+  /** 拉取某一年事件并并入快照（已有或不可用则跳过） */
+  fetchYear(year: number): Promise<void>
 }
 
 const AppStoreContext = createContext<AppStoreValue | null>(null)
@@ -63,6 +72,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<AnalysisSnapshot | null>(null)
   const [snapshotSaveFailed, setSnapshotSaveFailed] = useState(false)
   const [crawl, setCrawl] = useState<CrawlState>({ kind: 'idle' })
+  const [eventFetch, setEventFetch] = useState<EventFetchState | null>(null)
 
   const clientRef = useRef<{ token: string; client: GitCodeClient } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -113,6 +123,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         }
         const ok = saveSnapshot(snap)
         setSnapshotSaveFailed(!ok)
+        snapshotRef.current = snap
         setSnapshot(snap)
         setCrawl({ kind: 'done', at: snap.createdAt })
       })
@@ -142,6 +153,41 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setSnapshot(next)
   }, [])
 
+  /** 将新的快照写入状态与 localStorage */
+  const commitSnapshot = useCallback((next: AnalysisSnapshot) => {
+    const ok = saveSnapshot(next)
+    setSnapshotSaveFailed(!ok)
+    snapshotRef.current = next
+    setSnapshot(next)
+  }, [])
+
+  const fetchYear = useCallback(
+    async (year: number) => {
+      const snap = snapshotRef.current
+      if (!snap || !token) return
+      const key = String(year)
+      if (snap.eventsByYear[key] || snap.eventsUnavailable?.[key]) return
+      setEventFetch({ year, error: null })
+      const outcome = await fetchEventsYear(getClient(), snap.login, year, {})
+      if (outcome.status === 'ok') {
+        commitSnapshot({
+          ...snap,
+          eventsByYear: { ...snap.eventsByYear, [key]: outcome.events },
+        })
+        setEventFetch(null)
+      } else if (outcome.status === 'scope') {
+        commitSnapshot({
+          ...snap,
+          eventsUnavailable: { ...(snap.eventsUnavailable ?? {}), [key]: 'scope' },
+        })
+        setEventFetch(null)
+      } else {
+        setEventFetch({ year, error: outcome.message })
+      }
+    },
+    [token, getClient, commitSnapshot],
+  )
+
   const signIn = useCallback(
     async (inputToken: string, remember: boolean): Promise<GitCodeUser> => {
       const client = new GitCodeClient(inputToken)
@@ -169,6 +215,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setSnapshot(null)
     setSnapshotSaveFailed(false)
     setCrawl({ kind: 'idle' })
+    setEventFetch(null)
   }, [])
 
   // 登录后：没有可复用快照时自动开抓（切换账号时先清掉旧快照）
@@ -224,12 +271,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       snapshot,
       snapshotSaveFailed,
       crawl,
+      eventFetch,
       signIn,
       signOut,
       getClient,
       startCrawl,
       abortCrawl,
       toggleExclude,
+      fetchYear,
     }),
     [
       token,
@@ -239,12 +288,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       snapshot,
       snapshotSaveFailed,
       crawl,
+      eventFetch,
       signIn,
       signOut,
       getClient,
       startCrawl,
       abortCrawl,
       toggleExclude,
+      fetchYear,
     ],
   )
 
