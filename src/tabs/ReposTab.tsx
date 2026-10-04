@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react'
 import type { EChartsOption } from 'echarts'
+import DeepCrawlControls from '../components/DeepCrawlControls'
 import EChart from '../components/EChart'
 import EmptyState from '../components/EmptyState'
-import ProgressBar from '../components/ProgressBar'
 import { useAppStore } from '../state/AppStore'
 import {
   aggregateLanguages,
-  deepCommitCount,
   languageStarWeighted,
   namespaceStats,
   repoCreationTimeline,
@@ -33,17 +32,7 @@ function truncate(name: string, max = 26): string {
 type LangCalibre = 'repo' | 'star'
 
 export default function ReposTab() {
-  const {
-    snapshot,
-    crawl,
-    startCrawl,
-    toggleExclude,
-    deepCrawl,
-    startDeepCrawl,
-    abortDeepCrawl,
-    deepScope,
-    setDeepScope,
-  } = useAppStore()
+  const { snapshot, crawl, startCrawl, toggleExclude } = useAppStore()
   const [query, setQuery] = useState('')
   const [calibre, setCalibre] = useState<LangCalibre>('repo')
 
@@ -282,11 +271,6 @@ export default function ReposTab() {
     }
   }, [nsStats])
 
-  const deepTotal = useMemo(
-    () => deepCommitCount(snapshot?.commitsRecentByRepo),
-    [snapshot],
-  )
-
   if (!snapshot) {
     return (
       <EmptyState
@@ -375,6 +359,16 @@ export default function ReposTab() {
         </div>
       )}
 
+      <div className="card repos-actionbar">
+        <div className="repos-actionbar-title">
+          <span className="muted">数据抓取</span>
+          <button type="button" className="btn" onClick={startCrawl} disabled={crawl.kind === 'running'}>
+            {crawl.kind === 'running' ? '主抓取进行中…' : '重新抓取全部数据'}
+          </button>
+        </div>
+        <DeepCrawlControls />
+      </div>
+
       <div className="repos-toolbar">
         <div className="repos-toolbar-info">
           <strong>{metrics.total}</strong> 个仓库 · 排除 <strong>{metrics.excluded}</strong> ·
@@ -387,50 +381,7 @@ export default function ReposTab() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <button type="button" className="btn" onClick={startCrawl} disabled={crawl.kind === 'running'}>
-          {crawl.kind === 'running' ? '抓取中…' : '重新抓取'}
-        </button>
-        {deepCrawl.kind === 'running' ? (
-          <div className="deep-crawl-inline">
-            <ProgressBar current={deepCrawl.current} total={deepCrawl.total} />
-            <button type="button" className="btn danger" onClick={abortDeepCrawl}>
-              中断
-            </button>
-          </div>
-        ) : (
-          <>
-            <label
-              className="deep-scope-check"
-              title="默认只抓 namespace 为本人的仓库；勾选后也抓你加入的社区/组织仓库（其中他人的提交会混入提交级时段分析）"
-            >
-              <input
-                type="checkbox"
-                checked={deepScope === 'all'}
-                onChange={(e) => setDeepScope(e.target.checked ? 'all' : 'personal')}
-              />
-              含社区/组织仓库
-            </label>
-            <button
-              type="button"
-              className="btn"
-              onClick={startDeepCrawl}
-              disabled={crawl.kind === 'running'}
-              title="逐仓库拉取最近 100 条提交（走限流队列，可中断，增量续抓）"
-            >
-              {deepTotal > 0 ? `深度抓取（已 ${formatCount(deepTotal)} 条）` : '深度抓取提交'}
-            </button>
-          </>
-        )}
       </div>
-
-      {deepCrawl.kind === 'error' && (
-        <p className="activity-error">
-          深度抓取失败：{deepCrawl.message}
-          <button type="button" className="btn" onClick={startDeepCrawl}>
-            重试
-          </button>
-        </p>
-      )}
 
       <p className="muted">
         取消勾选即把该仓库排除出统计口径（总览、活跃度、年度报告同步生效）。

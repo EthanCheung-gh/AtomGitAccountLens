@@ -843,6 +843,38 @@ code {
   white-space: nowrap;
 }
 
+.deep-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* 数据抓取动作栏（仓库 Tab 顶部，始终可见） */
+.repos-actionbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 12px 16px;
+}
+
+.repos-actionbar > .deep-controls-row,
+.repos-actionbar > .deep-crawl-msg {
+  flex: 1;
+  min-width: 220px;
+}
+
+.repos-actionbar-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .deep-crawl-msg {
   margin: 0 0 8px;
 }

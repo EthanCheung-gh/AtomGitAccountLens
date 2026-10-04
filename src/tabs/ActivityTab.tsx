@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { EChartsOption } from 'echarts'
+import DeepCrawlControls from '../components/DeepCrawlControls'
 import EChart from '../components/EChart'
 import EmptyState from '../components/EmptyState'
-import ProgressBar from '../components/ProgressBar'
 import ScopeGuide from '../components/ScopeGuide'
 import StatCard from '../components/StatCard'
 import { useAppStore } from '../state/AppStore'
@@ -31,18 +31,7 @@ function truncate(name: string, max = 26): string {
 }
 
 export default function ActivityTab() {
-  const {
-    snapshot,
-    crawl,
-    startCrawl,
-    eventFetch,
-    fetchYear,
-    deepCrawl,
-    startDeepCrawl,
-    abortDeepCrawl,
-    deepScope,
-    setDeepScope,
-  } = useAppStore()
+  const { snapshot, crawl, startCrawl, eventFetch, fetchYear, deepCrawl } = useAppStore()
   const [year, setYear] = useState<number>(currentYear())
 
   const years = useMemo<number[]>(() => {
@@ -407,17 +396,35 @@ export default function ActivityTab() {
       )}
 
       {unavailable === 'scope' ? (
-        <div className="card">
-          <h3>{year} 年动态</h3>
-          <ScopeGuide />
-        </div>
+        <>
+          <div className="card">
+            <h3>{year} 年动态</h3>
+            <ScopeGuide />
+          </div>
+          <div className="card chart-card">
+            <h3>深度抓取（提交级分析，不依赖动态权限）</h3>
+            <DeepCrawlControls />
+          </div>
+        </>
       ) : unavailable === 'error' ? (
-        <EmptyState title={`${year} 年动态拉取失败`} hint="可回到仓库画像页点「重新抓取」重试。" />
+        <>
+          <EmptyState title={`${year} 年动态拉取失败`} hint="可回到仓库画像页点「重新抓取」重试。" />
+          <div className="card chart-card">
+            <h3>深度抓取（提交级分析，不依赖动态权限）</h3>
+            <DeepCrawlControls />
+          </div>
+        </>
       ) : !events || events.length === 0 ? (
         loading ? (
           <EmptyState title={`正在拉取 ${year} 年动态…`} />
         ) : (
-          <EmptyState title={`${year} 年没有动态数据`} hint="换个年份试试。" />
+          <>
+            <EmptyState title={`${year} 年没有动态数据`} hint="换个年份试试，或先用深度抓取做提交级分析。" />
+            <div className="card chart-card">
+              <h3>深度抓取（提交级分析，不依赖动态权限）</h3>
+              <DeepCrawlControls />
+            </div>
+          </>
         )
       ) : (
         <>
@@ -468,15 +475,7 @@ export default function ActivityTab() {
               <h3>
                 提交级时段（深度抓取{deepTotal > 0 ? ` · ${formatCount(deepTotal)} 条提交样本` : ''}）
               </h3>
-              {deepCrawl.kind === 'running' ? (
-                <>
-                  <p className="muted deep-crawl-msg">{deepCrawl.message}</p>
-                  <ProgressBar current={deepCrawl.current} total={deepCrawl.total} />
-                  <button type="button" className="btn danger deep-crawl-abort" onClick={abortDeepCrawl}>
-                    中断深度抓取
-                  </button>
-                </>
-              ) : deepTotal > 0 ? (
+              {deepCrawl.kind !== 'running' && deepTotal > 0 ? (
                 <>
                   <EChart option={deepHourOption} height={230} />
                   <p className="muted">按提交的作者时间（比推送时间更精确），每仓库最近 100 条。</p>
@@ -486,29 +485,7 @@ export default function ActivityTab() {
                   <p className="muted">
                     深度抓取每仓库最近 100 条提交（每仓库 1 次请求，走限流队列），可按提交作者时间精确分析时段。
                   </p>
-                  <label
-                    className="deep-scope-check"
-                    title="默认只抓 namespace 为本人的仓库；勾选后也抓你加入的社区/组织仓库（其中他人的提交会混入时段分析）"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={deepScope === 'all'}
-                      onChange={(e) => setDeepScope(e.target.checked ? 'all' : 'personal')}
-                    />
-                    含我加入的社区/组织仓库
-                  </label>
-                  {deepCrawl.kind === 'error' && (
-                    <p className="token-error">深度抓取失败：{deepCrawl.message}</p>
-                  )}
-                  {deepCrawl.kind === 'aborted' && <p className="token-error">深度抓取已中断，可续抓。</p>}
-                  <button
-                    type="button"
-                    className="btn primary"
-                    onClick={startDeepCrawl}
-                    disabled={crawl.kind === 'running'}
-                  >
-                    {deepCrawl.kind === 'aborted' ? '继续深度抓取' : '深度抓取最近提交'}
-                  </button>
+                  <DeepCrawlControls />
                 </>
               )}
             </div>
