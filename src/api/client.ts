@@ -306,7 +306,7 @@ export function normalizeEventsPage(raw: unknown): NormalizedEventsPage {
   return { byDate: {}, next: undefined }
 }
 
-/** 归一化最近提交为精简记录（sha 截 7 位、message 截 80 字符，取作者时间优先） */
+/** 归一化最近提交为精简记录（sha 截 7 位、message 截 80 字符，取作者时间优先，附作者登录名） */
 export function normalizeDeepCommits(raw: unknown): DeepCommitLite[] {
   if (!Array.isArray(raw)) return []
   const out: DeepCommitLite[] = []
@@ -314,9 +314,10 @@ export function normalizeDeepCommits(raw: unknown): DeepCommitLite[] {
     if (!item || typeof item !== 'object') continue
     const c = item as {
       sha?: unknown
+      author?: { login?: unknown } | null
       commit?: {
-        author?: { date?: unknown }
-        committer?: { date?: unknown }
+        author?: { date?: unknown; login?: unknown }
+        committer?: { date?: unknown; login?: unknown }
         message?: unknown
       } | null
     }
@@ -326,8 +327,17 @@ export function normalizeDeepCommits(raw: unknown): DeepCommitLite[] {
       (typeof c.commit?.committer?.date === 'string' && c.commit.committer.date) ||
       ''
     const message = typeof c.commit?.message === 'string' ? c.commit.message : ''
+    const author =
+      (typeof c.commit?.author?.login === 'string' && c.commit.author.login) ||
+      (typeof c.author?.login === 'string' && c.author.login) ||
+      undefined
     if (!sha && !date) continue
-    out.push({ sha, date, message: message.replace(/\s+/g, ' ').trim().slice(0, 80) })
+    out.push({
+      sha,
+      date,
+      message: message.replace(/\s+/g, ' ').trim().slice(0, 80),
+      ...(author ? { author } : {}),
+    })
   }
   return out
 }

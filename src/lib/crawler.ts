@@ -176,16 +176,22 @@ export interface DeepCrawlResult {
   commitsByRepo: Record<string, DeepCommitLite[]>
   /** 拉取失败（非 404、非中断）的仓库数 */
   failedCount: number
+  /** 达到单仓库页数上限被截断的仓库路径（每仓库上限 50 页 × 100 条） */
+  truncated: string[]
 }
 
 /** 深度抓取范围：personal = 仅本人命名空间仓库；all = 含加入的社区/组织仓库 */
 export type DeepCrawlScope = 'personal' | 'all'
 
+/** 单仓库提交翻页上限（50 页 × 100 条 = 5000 条），防止超大仓库拖垮配额与存储 */
+export const MAX_COMMIT_PAGES_PER_REPO = 50
+
 /**
- * 深度抓取：逐仓库拉最近 100 条提交（每仓库 1 次请求）。
+ * 深度抓取：逐仓库**全时段**翻页拉取提交（per_page=100，直至短页）。
  * - skip 中的仓库不再重复拉（增量）；404/私有受限仓库记空表继续
  * - scope='personal' 时只抓 namespace === login 的本人仓库，
- *   排除加入的社区/组织仓库（其中的他人提交会污染作者时段分析）
+ *   排除加入的社区/组织仓库（配合作者过滤也可放心包含）
+ * - 单仓库超过上限时截断并记入 truncated
  */
 export async function deepCrawlCommits(
   client: GitCodeClient,
@@ -212,24 +218,44 @@ export async function deepCrawlCommits(
   })
   const commitsByRepo: Record<string, DeepCommitLite[]> = {}
   let failedCount = 0
+  const truncated: string[] = []
   for (let i = 0; i < targets.length; i++) {
     const repo = targets[i]
     const path = repoPath(repo)
     const ownerName = repoOwnerName(repo)!
-    onProgress?.({
-      phase: 'events',
-      current: i + 1,
-      total: targets.length,
-      message: `深度抓取提交（${i + 1}/${targets.length}）${path}`,
-    })
-    try {
-      const raw = await client.listRepoCommits(ownerName.owner, ownerName.repo, {}, signal)
-      commitsByRepo[path] = normalizeDeepCommits(raw)
-    } catch (err) {
-      if (isApiError(err, 'aborted')) throw err
-      commitsByRepo[path] = []
-      if (!isApiError(err, 'notFound')) failedCount += 1
+    const collected: DeepCommitLite[] = []
+    let page = 1
+    for (; page <= MAX_COMMIT_PAGES_PER_REPO; page++) {
+      onProgress?.({
+        phase: 'events',
+        current: i + 1,
+        total: targets.length,
+        message: `深度抓取提交（${i + 1}/${targets.length}）${path} · 第 ${page} 页 · 已 ${collected.length} 条`,
+      })
+      try {
+        const raw = await client.listRepoCommits(
+          ownerName.owner,
+          ownerName.repo,
+          { page, perPage: 100 },
+          signal,
+        )
+        const batch = normalizeDeepCommits(raw)
+        collected.push(...batch)
+        if (batch.length < 100) break
+      } catch (err) {
+        if (isApiError(err, 'aborted')) throw err
+        if (page === 1) {
+          commitsByRepo[path] = [] // 首页即失败：空表（404/权限）
+          if (!isApiError(err, 'notFound')) failedCount += 1
+        }
+        // 后续页失败：保留已抓到的部分
+        break
+      }
+    }
+    if (collected.length > 0) {
+      commitsByRepo[path] = collected
+      if (page > MAX_COMMIT_PAGES_PER_REPO) truncated.push(path)
     }
   }
-  return { commitsByRepo, failedCount }
+  return { commitsByRepo, failedCount, truncated }
 }

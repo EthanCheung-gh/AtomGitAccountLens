@@ -37,7 +37,7 @@ export interface EventFetchState {
 export type DeepCrawlState =
   | { kind: 'idle' }
   | { kind: 'running'; current: number; total: number; message: string }
-  | { kind: 'done'; at: string; fetched: number; failed: number }
+  | { kind: 'done'; at: string; fetched: number; failed: number; truncated: number }
   | { kind: 'error'; message: string }
   | { kind: 'aborted' }
 
@@ -63,8 +63,10 @@ export interface AppStoreValue {
   toggleExclude(repoPath: string): void
   /** 拉取某一年事件并并入快照（已有或不可用则跳过） */
   fetchYear(year: number): Promise<void>
-  /** 深度抓取最近提交（增量：已抓过的仓库跳过） */
+  /** 深度抓取最近提交（增量：已抓到的仓库跳过） */
   startDeepCrawl(): void
+  /** 清空已深度抓取的提交并全量重抓（旧数据/换范围后用） */
+  resetDeepCrawl(): void
   abortDeepCrawl(): void
   /** 深度抓取范围偏好：personal=仅本人命名空间（默认），all=含加入的社区/组织仓库 */
   deepScope: DeepCrawlScope
@@ -252,6 +254,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           at: new Date().toISOString(),
           fetched: Object.keys(result.commitsByRepo).length,
           failed: result.failedCount,
+          truncated: result.truncated.length,
         })
       })
       .catch((err: unknown) => {
@@ -266,6 +269,16 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const abortDeepCrawl = useCallback(() => {
     deepAbortRef.current?.abort()
   }, [])
+
+  /** 清空深度提交数据并立即全量重抓 */
+  const resetDeepCrawl = useCallback(() => {
+    const snap = snapshotRef.current
+    if (!snap || !token) return
+    if (deepKindRef.current === 'running') return
+    const next: AnalysisSnapshot = { ...snap, commitsRecentByRepo: {} }
+    commitSnapshot(next)
+    startDeepCrawl()
+  }, [token, commitSnapshot, startDeepCrawl])
 
   const setDeepScopeWithRef = useCallback((scope: DeepCrawlScope) => {
     deepScopeRef.current = scope
@@ -367,6 +380,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       toggleExclude,
       fetchYear,
       startDeepCrawl,
+      resetDeepCrawl,
       abortDeepCrawl,
       deepScope,
       setDeepScope: setDeepScopeWithRef,
@@ -389,6 +403,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       toggleExclude,
       fetchYear,
       startDeepCrawl,
+      resetDeepCrawl,
       abortDeepCrawl,
       deepScope,
       setDeepScopeWithRef,

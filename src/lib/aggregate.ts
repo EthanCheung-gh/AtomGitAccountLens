@@ -624,17 +624,15 @@ export function repoMonthlyStack(
   return { months, series: top.map(({ repo, data }) => ({ repo, data })) }
 }
 
-/** 深度抓取提交的小时直方图（0-23，作者时间，本地时区） */
+/** 深度抓取提交的小时直方图（0-23，作者时间，本地时区，可选仅本人） */
 export function commitHourHistogram(
   commitsByRepo: Record<string, DeepCommitLite[]> | undefined,
+  login?: string,
 ): number[] {
   const hist = new Array(24).fill(0)
-  if (!commitsByRepo) return hist
-  for (const list of Object.values(commitsByRepo)) {
-    for (const c of list) {
-      const h = new Date(c.date).getHours()
-      if (Number.isFinite(h) && h >= 0 && h < 24) hist[h] += 1
-    }
+  for (const { c } of flattenDeepCommits(commitsByRepo, login)) {
+    const h = new Date(c.date).getHours()
+    if (Number.isFinite(h) && h >= 0 && h < 24) hist[h] += 1
   }
   return hist
 }
@@ -674,4 +672,199 @@ export function deepCommitMeta(
     }
   }
   return meta
+}
+
+// ---------- 提交级深度分析（全时段，可按作者过滤） ----------
+
+/**
+ * 作者过滤：提交作者未知（旧数据/无 login）时视为本人，避免个人仓库全部被排除；
+ * 已知且不同于 login 的排除。
+ */
+function isOwnCommit(c: DeepCommitLite, loginLower: string | null): boolean {
+  if (!loginLower) return true
+  if (!c.author) return true
+  return c.author.toLowerCase() === loginLower
+}
+
+export interface FlatCommit {
+  repo: string
+  c: DeepCommitLite
+}
+
+/** 展平全时段提交（可选仅本人），供各类图表/列表复用 */
+export function flattenDeepCommits(
+  commitsByRepo: Record<string, DeepCommitLite[]> | undefined,
+  login?: string,
+): FlatCommit[] {
+  if (!commitsByRepo) return []
+  const loginLower = login ? login.toLowerCase() : null
+  const out: FlatCommit[] = []
+  for (const [repo, list] of Object.entries(commitsByRepo)) {
+    for (const c of list) {
+      if (isOwnCommit(c, loginLower)) out.push({ repo, c })
+    }
+  }
+  return out
+}
+
+/** 周一..周日（0-6）的提交分布 */
+export function commitWeekdayHistogram(
+  commitsByRepo: Record<string, DeepCommitLite[]> | undefined,
+  login?: string,
+): number[] {
+  const hist = new Array(7).fill(0)
+  for (const { c } of flattenDeepCommits(commitsByRepo, login)) {
+    const day = new Date(c.date).getDay()
+    if (Number.isFinite(day)) hist[(day + 6) % 7] += 1
+  }
+  return hist
+}
+
+/** 提交级 7×24 矩阵：行=周一..周日，列=0-23 时（作者时间，本地时区） */
+export function commitWeekdayHourMatrix(
+  commitsByRepo: Record<string, DeepCommitLite[]> | undefined,
+  login?: string,
+): number[][] {
+  const matrix: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0))
+  for (const { c } of flattenDeepCommits(commitsByRepo, login)) {
+    const d = new Date(c.date)
+    if (Number.isNaN(d.getTime())) continue
+    matrix[(d.getDay() + 6) % 7][d.getHours()] += 1
+  }
+  return matrix
+}
+
+/** 全时段月度提交序列（YYYY-MM，缺口补 0，升序） */
+export function commitMonthlySeries(
+  commitsByRepo: Record<string, DeepCommitLite[]> | undefined,
+  login?: string,
+): MonthCount[] {
+  const counts = new Map<string, number>()
+  for (const { c } of flattenDeepCommits(commitsByRepo, login)) {
+    const d = new Date(c.date)
+    if (Number.isNaN(d.getTime())) continue
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  const keys = [...counts.keys()].sort()
+  if (keys.length === 0) return []
+  const out: MonthCount[] = []
+  let cursor = new Date(`${keys[0]}-01T00:00:00`)
+  const end = new Date(`${keys[keys.length - 1]}-01T00:00:00`)
+  for (; cursor <= end; cursor.setMonth(cursor.getMonth() + 1)) {
+    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
+    out.push({ month: key, count: counts.get(key) ?? 0 })
+  }
+  return out
+}
+
+export interface YearCount {
+  year: number
+  count: number
+}
+
+/** 全时段年度提交序列（连续年份补 0） */
+export function commitYearlySeries(
+  commitsByRepo: Record<string, DeepCommitLite[]> | undefined,
+  login?: string,
+): YearCount[] {
+  const counts = new Map<number, number>()
+  for (const { c } of flattenDeepCommits(commitsByRepo, login)) {
+    const y = new Date(c.date).getFullYear()
+    if (Number.isNaN(y)) continue
+    counts.set(y, (counts.get(y) ?? 0) + 1)
+  }
+  const years = [...counts.keys()].sort((a, b) => a - b)
+  if (years.length === 0) return []
+  const out: YearCount[] = []
+  for (let y = years[0]; y <= years[years.length - 1]; y++) {
+    out.push({ year: y, count: counts.get(y) ?? 0 })
+  }
+  return out
+}
+
+export interface CommitTypeStat {
+  type: string
+  label: string
+  count: number
+}
+
+const COMMIT_TYPE_LABELS: Record<string, string> = {
+  feat: 'feat 新功能',
+  fix: 'fix 修复',
+  docs: 'docs 文档',
+  style: 'style 格式',
+  refactor: 'refactor 重构',
+  perf: 'perf 性能',
+  test: 'test 测试',
+  chore: 'chore 杂务',
+  build: '构建',
+  ci: 'CI',
+  revert: '回退',
+  merge: '合并',
+  init: '初始化',
+  other: '其他',
+}
+
+const TYPE_ALIAS: Record<string, string> = { doc: 'docs', improvement: 'refactor' }
+
+/** 提交类型分布（Conventional Commits 风格解析：`type(scope)!: 描述`） */
+export function commitTypeBreakdown(
+  commitsByRepo: Record<string, DeepCommitLite[]> | undefined,
+  login?: string,
+): CommitTypeStat[] {
+  const counts = new Map<string, number>()
+  for (const { c } of flattenDeepCommits(commitsByRepo, login)) {
+    const m = /^\s*([A-Za-z][a-z0-9_-]*)(?:\([^)]*\))?!?:\s/.exec(c.message)
+    let type = 'other'
+    if (m) {
+      const raw = m[1].toLowerCase()
+      type = TYPE_ALIAS[raw] ?? (COMMIT_TYPE_LABELS[raw] ? raw : 'other')
+    } else if (/^merge /i.test(c.message)) type = 'merge'
+    counts.set(type, (counts.get(type) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .map(([type, count]) => ({ type, label: COMMIT_TYPE_LABELS[type] ?? type, count }))
+    .sort((a, b) => b.count - a.count)
+}
+
+/** 每仓库提交数（全时段口径，可选仅本人），降序 */
+export function repoCommitTotals(
+  commitsByRepo: Record<string, DeepCommitLite[]> | undefined,
+  login?: string,
+): { repo: string; count: number }[] {
+  const counts = new Map<string, number>()
+  for (const { repo } of flattenDeepCommits(commitsByRepo, login)) {
+    counts.set(repo, (counts.get(repo) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .map(([repo, count]) => ({ repo, count }))
+    .sort((a, b) => b.count - a.count)
+}
+
+export interface RecentCommitItem {
+  repo: string
+  sha: string
+  date: string
+  message: string
+  author: string | null
+}
+
+/** 最近提交样本（按作者时间倒序） */
+export function recentCommits(
+  commitsByRepo: Record<string, DeepCommitLite[]> | undefined,
+  login?: string,
+  topN = 20,
+): RecentCommitItem[] {
+  return flattenDeepCommits(commitsByRepo, login)
+    .map(({ repo, c }) => ({
+      repo,
+      sha: c.sha,
+      date: c.date,
+      message: c.message,
+      author: c.author ?? null,
+    }))
+    .filter((x) => x.date)
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    .slice(0, topN)
 }

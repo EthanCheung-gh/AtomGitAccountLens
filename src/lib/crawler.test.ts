@@ -12,12 +12,16 @@ function repo(partial: Partial<GitCodeRepo> & { path: string }): GitCodeRepo {
 }
 
 function fakeClient(
-  behavior: Record<string, () => unknown> = {},
+  behavior: Record<string, (opts: { page?: number }) => unknown> = {},
 ): GitCodeClient {
   return {
-    async listRepoCommits(_owner: string, repo: string): Promise<unknown> {
+    async listRepoCommits(
+      _owner: string,
+      repo: string,
+      opts: { page?: number } = {},
+    ): Promise<unknown> {
       const handler = behavior[repo]
-      if (handler) return handler()
+      if (handler) return handler(opts)
       return [
         {
           sha: 'abc1234567',
@@ -95,5 +99,37 @@ describe('deepCrawlCommits scope', () => {
     expect(seen).toHaveLength(2)
     expect(seen[0]).toContain('1/2')
     expect(seen[1]).toContain('me/y')
+  })
+
+  it('全时段翻页：短页即停，累计多页提交', async () => {
+    const commit = (i: number) => ({
+      sha: `sha${i}000000000`,
+      commit: { author: { date: '2026-01-01T10:00:00+08:00' }, message: `m${i}` },
+    })
+    const client = fakeClient({
+      paged: ({ page = 1 }) =>
+        page === 1 ? Array.from({ length: 100 }, (_, i) => commit(i))
+          : Array.from({ length: 40 }, (_, i) => commit(100 + i)),
+    })
+    const result = await deepCrawlCommits(client, [repo({ path: 'me/paged' })], {
+      scope: 'personal',
+      login: 'me',
+    })
+    expect(result.commitsByRepo['me/paged']).toHaveLength(140)
+    expect(result.truncated).toEqual([])
+  })
+
+  it('单仓库超上限被截断并计入 truncated', async () => {
+    const client = fakeClient({
+      huge: () => Array.from({ length: 100 }, (_, i) => ({ sha: `s${i}` })),
+    })
+    const result = await deepCrawlCommits(client, [repo({ path: 'me/huge' })], {
+      scope: 'personal',
+      login: 'me',
+    })
+    expect(result.commitsByRepo['me/huge']).toHaveLength(
+      50 * 100, // MAX_COMMIT_PAGES_PER_REPO × 100
+    )
+    expect(result.truncated).toEqual(['me/huge'])
   })
 })

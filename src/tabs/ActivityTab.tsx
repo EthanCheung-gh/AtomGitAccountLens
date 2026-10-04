@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { EChartsOption } from 'echarts'
-import DeepCrawlAnalysis from '../components/DeepCrawlAnalysis'
+import DeepAnalysisSection from '../components/DeepAnalysisSection'
 import DeepCrawlControls from '../components/DeepCrawlControls'
 import EChart from '../components/EChart'
 import EmptyState from '../components/EmptyState'
@@ -368,7 +368,6 @@ export default function ActivityTab() {
           <div className="card chart-card">
             <h3>深度抓取（提交级分析，不依赖动态权限）</h3>
             <DeepCrawlControls />
-            <DeepCrawlAnalysis />
           </div>
         </>
       ) : unavailable === 'error' ? (
@@ -377,7 +376,6 @@ export default function ActivityTab() {
           <div className="card chart-card">
             <h3>深度抓取（提交级分析，不依赖动态权限）</h3>
             <DeepCrawlControls />
-            <DeepCrawlAnalysis />
           </div>
         </>
       ) : !events || events.length === 0 ? (
@@ -389,7 +387,6 @@ export default function ActivityTab() {
             <div className="card chart-card">
               <h3>深度抓取（提交级分析，不依赖动态权限）</h3>
               <DeepCrawlControls />
-              <DeepCrawlAnalysis />
             </div>
           </>
         )
@@ -441,7 +438,6 @@ export default function ActivityTab() {
             <div className="card chart-card">
               <h3>提交级时段（深度抓取）</h3>
               <DeepCrawlControls />
-              <DeepCrawlAnalysis />
             </div>
           </div>
 
@@ -463,6 +459,8 @@ export default function ActivityTab() {
           </div>
         </>
       )}
+
+      <DeepAnalysisSection />
     </section>
   )
 }

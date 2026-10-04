@@ -64,7 +64,7 @@ export interface AccountEvent {
   createdAt: string | null
 }
 
-/** 深度抓取的提交精简记录（每仓库最近 N 条） */
+/** 深度抓取的提交精简记录（全时段翻页抓取） */
 export interface DeepCommitLite {
   /** 提交 SHA（截断 7 位） */
   sha: string
@@ -72,4 +72,6 @@ export interface DeepCommitLite {
   date: string
   /** 提交信息（截断） */
   message: string
+  /** 作者登录名（GitCode 提交对象带 commit.author.login，用于「仅本人提交」过滤） */
+  author?: string
 }

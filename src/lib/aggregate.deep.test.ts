@@ -4,6 +4,11 @@ import {
   actionBreakdown,
   actionLabel,
   commitHourHistogram,
+  commitMonthlySeries,
+  commitTypeBreakdown,
+  commitWeekdayHistogram,
+  commitWeekdayHourMatrix,
+  commitYearlySeries,
   cumulativeCommits,
   deepCommitCount,
   deepCommitMeta,
@@ -11,6 +16,8 @@ import {
   longestGapDays,
   namespaceStats,
   pushSizeStats,
+  recentCommits,
+  repoCommitTotals,
   repoCreationTimeline,
   repoFreshness,
   repoMonthlyStack,
@@ -242,5 +249,86 @@ describe('deep commits helpers', () => {
       last: '2026-02-05T09:30:00+08:00',
     })
     expect(deepCommitMeta(undefined)).toEqual({ total: 0, repos: 0, first: null, last: null })
+  })
+})
+
+describe('全时段提交分析（含作者过滤）', () => {
+  const data: Record<string, DeepCommitLite[]> = {
+    'me/r1': [
+      // 2026-03-02 周一 10 点 / 14 点；2026-03-04 周三 22 点；2026-04-10 周五 09 点
+      { sha: 'aaaaaaa', date: '2026-03-02T10:00:00+08:00', message: 'feat: add x', author: 'Me' },
+      { sha: 'bbbbbbb', date: '2026-03-02T14:00:00+08:00', message: 'fix(core): crash', author: 'Me' },
+      { sha: 'ccccccc', date: '2026-03-04T22:00:00+08:00', message: 'docs: readme', author: 'other' },
+      { sha: 'ddddddd', date: '2026-04-10T09:00:00+08:00', message: '随便写写', author: 'Me' },
+    ],
+    'me/r2': [
+      { sha: 'eeeeeee', date: '2025-12-31T23:00:00+08:00', message: 'chore: bump', author: 'Me' },
+    ],
+  }
+
+  it('作者过滤：仅本人（大小写不敏感），未知作者计入本人', () => {
+    // login=me → 排除 author=other 的 1 条
+    const own = recentCommits(data, 'me', 10)
+    expect(own).toHaveLength(4)
+    const all = recentCommits(data, undefined, 10)
+    expect(all).toHaveLength(5)
+    const noAuthorData: Record<string, DeepCommitLite[]> = {
+      r: [{ sha: 'x', date: '2026-01-01T00:00:00Z', message: 'm' }],
+    }
+    expect(recentCommits(noAuthorData, 'me', 10)).toHaveLength(1) // 未知作者计入
+  })
+
+  it('最近提交按时间倒序', () => {
+    const r = recentCommits(data, undefined, 3)
+    expect(r[0].sha).toBe('ddddddd')
+    expect(r[1].sha).toBe('ccccccc')
+    expect(r[2].sha).toBe('bbbbbbb')
+  })
+
+  it('月度序列补缺口，年度序列补零年', () => {
+    const months = commitMonthlySeries(data, 'me')
+    expect(months.map((m) => `${m.month}:${m.count}`)).toEqual([
+      '2025-12:1',
+      '2026-01:0',
+      '2026-02:0',
+      '2026-03:2',
+      '2026-04:1',
+    ])
+    const years = commitYearlySeries(data, undefined)
+    expect(years).toEqual([
+      { year: 2025, count: 1 },
+      { year: 2026, count: 4 },
+    ])
+  })
+
+  it('周内分布与 7×24 矩阵（周一=0）', () => {
+    const wd = commitWeekdayHistogram(data, undefined)
+    expect(wd[0]).toBe(2) // 2026-03-02 周一两条
+    expect(wd[2]).toBe(2) // 2026-03-04 周三 + 2025-12-31 周三
+    expect(wd[4]).toBe(1) // 2026-04-10 周五
+    const matrix = commitWeekdayHourMatrix(data, undefined)
+    expect(matrix[0][10]).toBe(1)
+    expect(matrix[0][14]).toBe(1)
+    expect(matrix[2][22]).toBe(1)
+    expect(matrix[2][23]).toBe(1)
+    const total = matrix.flat().reduce((s, v) => s + v, 0)
+    expect(total).toBe(5)
+  })
+
+  it('提交类型解析（conventional + 别名 + 其他）', () => {
+    const types = commitTypeBreakdown(data, undefined)
+    const byType = new Map(types.map((t) => [t.type, t.count]))
+    expect(byType.get('feat')).toBe(1)
+    expect(byType.get('fix')).toBe(1)
+    expect(byType.get('docs')).toBe(1)
+    expect(byType.get('chore')).toBe(1)
+    expect(byType.get('other')).toBe(1) // 「随便写写」
+    expect(types[0].count).toBeGreaterThanOrEqual(types[types.length - 1].count)
+  })
+
+  it('每仓库提交数降序', () => {
+    const totals = repoCommitTotals(data, undefined)
+    expect(totals[0]).toEqual({ repo: 'me/r1', count: 4 })
+    expect(totals[1]).toEqual({ repo: 'me/r2', count: 1 })
   })
 })

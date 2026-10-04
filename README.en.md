@@ -13,7 +13,7 @@ Live site: `https://ethancheung-gh.github.io/AtomGitAccountLens/`
 - **Repo Portrait**: language composition with dual calibre (repo-weighted vs star-weighted toggle), repo creation timeline, freshness buckets (30d/6m/1y/dormant), top stargazed repos, personal/org namespace breakdown, per-repo exclusion checkboxes that instantly re-compute every statistic site-wide
 - **Activity**: yearly contribution heatmap (daily commits), 7×24 work-habit heatmap (weekday × hour), event-type breakdown, cumulative commit curve, push-size distribution (commits per push), monthly stacked repo activity, top-10 most active repos
 - **Annual Report**: natural-year selector producing a screenshot-shareable yearly summary (commits, active days, longest streak and longest gap, push habits, language mix)
-- **Deep crawl (optional)**: per-repo recent 100 commits through the rate-limited queue (abortable, incremental) for author-time-accurate hour analysis; personal-namespace repos only by default, with an option to include joined community/org repos
+- **Deep crawl (optional)**: paginates each repository's **full commit history** (100/page until short page, 5000/repo cap) through the rate-limited queue — abortable, incremental, one-click full re-crawl. Feeds commit-level analytics: full-history monthly timeline, commits per year, weekday distribution, hour distribution, 7×24 work-habit heatmap, Conventional-Commits type breakdown, per-repo commit top 10, recent-commit samples; an "own commits only" filter (by commit author login, unknown authors counted as own) keeps community/org repos analytically clean
 
 Engineering:
 
