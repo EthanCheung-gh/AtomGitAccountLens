@@ -2,10 +2,20 @@ import { useEffect, useMemo, useState } from 'react'
 import type { EChartsOption } from 'echarts'
 import EChart from '../components/EChart'
 import EmptyState from '../components/EmptyState'
+import ProgressBar from '../components/ProgressBar'
 import ScopeGuide from '../components/ScopeGuide'
 import StatCard from '../components/StatCard'
 import { useAppStore } from '../state/AppStore'
-import { summarizeEvents } from '../lib/aggregate'
+import {
+  actionBreakdown,
+  commitHourHistogram,
+  cumulativeCommits,
+  deepCommitCount,
+  pushSizeStats,
+  repoMonthlyStack,
+  summarizeEvents,
+  weekdayHourMatrix,
+} from '../lib/aggregate'
 import { currentYear, formatCount } from '../lib/format'
 
 const AXIS_COLOR = '#8b949e'
@@ -21,7 +31,7 @@ function truncate(name: string, max = 26): string {
 }
 
 export default function ActivityTab() {
-  const { snapshot, crawl, startCrawl, eventFetch, fetchYear } = useAppStore()
+  const { snapshot, crawl, startCrawl, eventFetch, fetchYear, deepCrawl, startDeepCrawl, abortDeepCrawl } = useAppStore()
   const [year, setYear] = useState<number>(currentYear())
 
   const years = useMemo<number[]>(() => {
@@ -100,62 +110,6 @@ export default function ActivityTab() {
     }
   }, [summary, year])
 
-  const hourOption = useMemo<EChartsOption>(
-    () => ({
-      tooltip: { ...TOOLTIP_STYLE, trigger: 'axis' },
-      grid: { left: 40, right: 12, top: 18, bottom: 26 },
-      xAxis: {
-        type: 'category',
-        data: Array.from({ length: 24 }, (_, h) => `${h}时`),
-        axisLabel: { color: AXIS_COLOR, interval: 2, fontSize: 11 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
-        axisTick: { show: false },
-      },
-      yAxis: {
-        type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
-      },
-      series: [
-        {
-          type: 'bar',
-          name: '动态次数',
-          data: summary.eventsByHour,
-          itemStyle: { color: '#58a6ff', borderRadius: [3, 3, 0, 0] },
-        },
-      ],
-    }),
-    [summary],
-  )
-
-  const monthOption = useMemo<EChartsOption>(
-    () => ({
-      tooltip: { ...TOOLTIP_STYLE, trigger: 'axis' },
-      grid: { left: 40, right: 12, top: 18, bottom: 26 },
-      xAxis: {
-        type: 'category',
-        data: Array.from({ length: 12 }, (_, i) => `${i + 1}月`),
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
-        axisTick: { show: false },
-      },
-      yAxis: {
-        type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
-      },
-      series: [
-        {
-          type: 'bar',
-          name: '提交次数',
-          data: summary.commitsByMonth,
-          itemStyle: { color: '#39d353', borderRadius: [3, 3, 0, 0] },
-        },
-      ],
-    }),
-    [summary],
-  )
-
   const topRepoOption = useMemo<EChartsOption>(() => {
     const top = summary.byRepo.slice(0, 10)
     const names = top.map((r) => truncate(r.repo)).reverse()
@@ -185,6 +139,216 @@ export default function ActivityTab() {
       ],
     }
   }, [summary])
+
+  // ---- 深挖图表（同一 events 数据源） ----
+  const actions = useMemo(() => actionBreakdown(events ?? []).slice(0, 10), [events])
+  const actionOption = useMemo<EChartsOption>(
+    () => ({
+      tooltip: { ...TOOLTIP_STYLE },
+      grid: { left: 8, right: 40, top: 8, bottom: 8, containLabel: true },
+      xAxis: {
+        type: 'value',
+        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
+        splitLine: { lineStyle: { color: SPLIT_LINE } },
+      },
+      yAxis: {
+        type: 'category',
+        data: actions.map((a) => a.label).reverse(),
+        axisLabel: { color: '#e6edf3', fontSize: 12 },
+        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisTick: { show: false },
+      },
+      series: [
+        {
+          type: 'bar',
+          data: actions.map((a) => a.count).reverse(),
+          itemStyle: { color: '#a371f7', borderRadius: [0, 3, 3, 0] },
+          label: { show: true, position: 'right', color: AXIS_COLOR, fontSize: 11 },
+        },
+      ],
+    }),
+    [actions],
+  )
+
+  const weekdayHour = useMemo(() => weekdayHourMatrix(events ?? []), [events])
+  const weekdayHourOption = useMemo<EChartsOption>(() => {
+    const max = Math.max(1, ...weekdayHour.flat())
+    const data: [number, number, number][] = []
+    weekdayHour.forEach((row, y) => row.forEach((v, x) => data.push([x, y, v])))
+    return {
+      tooltip: {
+        ...TOOLTIP_STYLE,
+        formatter: (p: unknown) => {
+          const d = (p as { value: [number, number, number] }).value
+          const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+          return `${days[d[1]]} ${d[0]}时：${d[2]} 次动态`
+        },
+      },
+      grid: { left: 44, right: 12, top: 10, bottom: 44 },
+      xAxis: {
+        type: 'category',
+        data: Array.from({ length: 24 }, (_, h) => `${h}`),
+        axisLabel: { color: AXIS_COLOR, interval: 1, fontSize: 10 },
+        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisTick: { show: false },
+        name: '时',
+        nameTextStyle: { color: AXIS_COLOR },
+      },
+      yAxis: {
+        type: 'category',
+        data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
+        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisTick: { show: false },
+      },
+      visualMap: {
+        min: 0,
+        max,
+        type: 'continuous',
+        orient: 'horizontal',
+        left: 'center',
+        bottom: 0,
+        itemWidth: 12,
+        itemHeight: 90,
+        inRange: { color: ['#161b22', '#1f3a5f', '#1f6feb', '#58a6ff', '#cfe3ff'] },
+        textStyle: { color: AXIS_COLOR },
+      },
+      series: [{ type: 'heatmap', data, label: { show: false } }],
+    }
+  }, [weekdayHour])
+
+  const cumulative = useMemo(() => cumulativeCommits(events ?? []), [events])
+  const cumulativeOption = useMemo<EChartsOption>(
+    () => ({
+      tooltip: { ...TOOLTIP_STYLE, trigger: 'axis' },
+      grid: { left: 48, right: 16, top: 18, bottom: 28 },
+      xAxis: {
+        type: 'time',
+        min: `${year}-01-01`,
+        max: `${year}-12-31`,
+        axisLabel: { color: AXIS_COLOR, fontSize: 11, formatter: '{MMM}' },
+        axisLine: { lineStyle: { color: SPLIT_LINE } },
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
+        splitLine: { lineStyle: { color: SPLIT_LINE } },
+      },
+      series: [
+        {
+          type: 'line',
+          smooth: true,
+          symbol: 'none',
+          data: cumulative.map((p) => [p.date, p.cumulative]),
+          areaStyle: { opacity: 0.25 },
+          lineStyle: { color: '#39d353', width: 2 },
+          itemStyle: { color: '#39d353' },
+        },
+      ],
+    }),
+    [cumulative, year],
+  )
+
+  const pushSizes = useMemo(() => pushSizeStats(events ?? []), [events])
+  const pushOption = useMemo<EChartsOption>(
+    () => ({
+      tooltip: { ...TOOLTIP_STYLE, trigger: 'axis' },
+      grid: { left: 40, right: 12, top: 18, bottom: 30 },
+      xAxis: {
+        type: 'category',
+        data: pushSizes.buckets.map((b) => `${b.label} 个`),
+        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
+        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisTick: { show: false },
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
+        splitLine: { lineStyle: { color: SPLIT_LINE } },
+      },
+      series: [
+        {
+          type: 'bar',
+          data: pushSizes.buckets.map((b) => b.count),
+          itemStyle: { color: '#f0883e', borderRadius: [3, 3, 0, 0] },
+        },
+      ],
+    }),
+    [pushSizes],
+  )
+
+  const monthlyStack = useMemo(() => repoMonthlyStack(events ?? [], year, 5), [events, year])
+  const monthlyStackOption = useMemo<EChartsOption>(
+    () => ({
+      tooltip: { ...TOOLTIP_STYLE, trigger: 'axis' },
+      legend: {
+        top: 0,
+        type: 'scroll',
+        textStyle: { color: AXIS_COLOR, fontSize: 11 },
+        icon: 'roundRect',
+        itemWidth: 12,
+        itemHeight: 8,
+      },
+      grid: { left: 44, right: 12, top: 34, bottom: 28 },
+      xAxis: {
+        type: 'category',
+        data: monthlyStack.months.map((m) => m.slice(5)),
+        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
+        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisTick: { show: false },
+        name: '月',
+        nameTextStyle: { color: AXIS_COLOR },
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
+        splitLine: { lineStyle: { color: SPLIT_LINE } },
+      },
+      series: monthlyStack.series.map((s) => ({
+        name: truncate(s.repo, 18),
+        type: 'bar',
+        stack: 'commits',
+        emphasis: { focus: 'series' as const },
+        data: s.data,
+      })),
+    }),
+    [monthlyStack],
+  )
+
+  const deepHist = useMemo(
+    () => commitHourHistogram(snapshot?.commitsRecentByRepo),
+    [snapshot],
+  )
+  const deepTotal = useMemo(
+    () => deepCommitCount(snapshot?.commitsRecentByRepo),
+    [snapshot],
+  )
+  const deepHourOption = useMemo<EChartsOption>(
+    () => ({
+      tooltip: { ...TOOLTIP_STYLE, trigger: 'axis' },
+      grid: { left: 40, right: 12, top: 18, bottom: 26 },
+      xAxis: {
+        type: 'category',
+        data: Array.from({ length: 24 }, (_, h) => `${h}时`),
+        axisLabel: { color: AXIS_COLOR, interval: 2, fontSize: 11 },
+        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisTick: { show: false },
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
+        splitLine: { lineStyle: { color: SPLIT_LINE } },
+      },
+      series: [
+        {
+          type: 'bar',
+          data: deepHist,
+          itemStyle: { color: '#39c5cf', borderRadius: [3, 3, 0, 0] },
+        },
+      ],
+    }),
+    [deepHist],
+  )
 
   if (!snapshot) {
     return (
@@ -264,13 +428,77 @@ export default function ActivityTab() {
 
           <div className="chart-grid">
             <div className="card chart-card">
-              <h3>活跃时段（按本地时间，动态次数）</h3>
-              <EChart option={hourOption} height={240} />
+              <h3>工作习惯（周 × 时段，本地时间）</h3>
+              <EChart option={weekdayHourOption} height={280} />
             </div>
             <div className="card chart-card">
-              <h3>提交趋势（按月）</h3>
-              <EChart option={monthOption} height={240} />
+              <h3>事件类型分布（Top 10）</h3>
+              {actions.length > 0 ? (
+                <EChart option={actionOption} height={Math.max(160, actions.length * 28 + 40)} />
+              ) : (
+                <p className="muted">暂无事件。</p>
+              )}
             </div>
+          </div>
+
+          <div className="card chart-card">
+            <h3>年度累积提交曲线</h3>
+            <EChart option={cumulativeOption} height={230} />
+          </div>
+
+          <div className="chart-grid">
+            <div className="card chart-card">
+              <h3>
+                推送粒度（平均 {pushSizes.avg} 个提交/次 · 单次最大 {pushSizes.max}）
+              </h3>
+              <EChart option={pushOption} height={230} />
+            </div>
+            <div className="card chart-card">
+              <h3>
+                提交级时段（深度抓取{deepTotal > 0 ? ` · ${formatCount(deepTotal)} 条提交样本` : ''}）
+              </h3>
+              {deepCrawl.kind === 'running' ? (
+                <>
+                  <p className="muted deep-crawl-msg">{deepCrawl.message}</p>
+                  <ProgressBar current={deepCrawl.current} total={deepCrawl.total} />
+                  <button type="button" className="btn danger deep-crawl-abort" onClick={abortDeepCrawl}>
+                    中断深度抓取
+                  </button>
+                </>
+              ) : deepTotal > 0 ? (
+                <>
+                  <EChart option={deepHourOption} height={230} />
+                  <p className="muted">按提交的作者时间（比推送时间更精确），每仓库最近 100 条。</p>
+                </>
+              ) : (
+                <>
+                  <p className="muted">
+                    深度抓取每仓库最近 100 条提交（每仓库 1 次请求，走限流队列），可按提交作者时间精确分析时段。
+                  </p>
+                  {deepCrawl.kind === 'error' && (
+                    <p className="token-error">深度抓取失败：{deepCrawl.message}</p>
+                  )}
+                  {deepCrawl.kind === 'aborted' && <p className="token-error">深度抓取已中断，可续抓。</p>}
+                  <button
+                    type="button"
+                    className="btn primary"
+                    onClick={startDeepCrawl}
+                    disabled={crawl.kind === 'running'}
+                  >
+                    {deepCrawl.kind === 'aborted' ? '继续深度抓取' : '深度抓取最近提交'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="card chart-card">
+            <h3>活跃仓库月度堆叠（Top 5，提交数）</h3>
+            {monthlyStack.series.length > 0 ? (
+              <EChart option={monthlyStackOption} height={260} />
+            ) : (
+              <p className="muted">暂无数据。</p>
+            )}
           </div>
 
           <div className="card chart-card">
