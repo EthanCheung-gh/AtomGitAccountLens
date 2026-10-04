@@ -350,6 +350,377 @@ code {
   padding-top: 12px;
 }
 
+/* ---------- empty state ---------- */
+.empty-state {
+  padding: 56px 20px;
+  text-align: center;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+
+.empty-state h2 {
+  color: var(--text);
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+
+.empty-state .btn {
+  margin-top: 14px;
+}
+
+/* ---------- crawl banner & progress ---------- */
+.crawl-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  margin-bottom: 14px;
+}
+
+.crawl-banner.running {
+  border-color: rgba(88, 166, 255, 0.4);
+}
+
+.crawl-banner.error {
+  border-color: rgba(248, 81, 73, 0.5);
+}
+
+.crawl-banner.aborted {
+  border-color: rgba(210, 153, 34, 0.5);
+}
+
+.crawl-banner-text {
+  flex: none;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.crawl-banner.error .crawl-banner-text {
+  color: var(--danger);
+}
+
+.crawl-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+.crawl-abort {
+  flex: none;
+}
+
+.progress-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 120px;
+}
+
+.progress-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 4px;
+  background: var(--panel-2);
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #1f6feb, #58a6ff);
+  transition: width 0.25s ease;
+}
+
+.progress-track.indeterminate::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 35%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #1f6feb, #58a6ff);
+  animation: slide 1.2s ease-in-out infinite;
+}
+
+@keyframes slide {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(320%); }
+}
+
+.progress-label {
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---------- overview ---------- */
+.overview-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 900px) {
+  .overview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.profile-card .profile-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.profile-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+}
+
+.profile-avatar.fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-2);
+  color: var(--accent);
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.profile-id h2 {
+  margin: 0;
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+
+.profile-id a {
+  font-size: 13px;
+}
+
+.profile-bio {
+  margin: 14px 0 8px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.stat-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stat-hint {
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.lang-card {
+  margin-bottom: 8px;
+}
+
+.lang-bars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.lang-chip {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  background: #1f3a5f;
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  color: #cfe3ff;
+}
+
+.snapshot-meta {
+  margin-top: 10px;
+}
+
+.snapshot-warning {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 1px solid rgba(210, 153, 34, 0.5);
+  border-radius: var(--radius);
+  color: var(--warn);
+  font-size: 13px;
+}
+
+.scope-guide {
+  padding: 10px 12px;
+  border: 1px dashed rgba(210, 153, 34, 0.5);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.scope-guide p {
+  margin: 0 0 6px;
+}
+
+.scope-guide.compact p {
+  margin: 0;
+}
+
+/* ---------- repos tab ---------- */
+.repos-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.repos-toolbar-info {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.repos-toolbar-info strong {
+  color: var(--text);
+}
+
+.repos-search {
+  width: 220px;
+  flex: 1;
+  max-width: 320px;
+}
+
+.repo-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.repo-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+
+.repo-row.excluded {
+  opacity: 0.45;
+}
+
+.repo-check {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+
+.repo-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.repo-name {
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.repo-desc {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.tag {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.tag-private {
+  border-color: rgba(210, 153, 34, 0.5);
+  color: var(--warn);
+}
+
+.tag-lang {
+  border-color: rgba(88, 166, 255, 0.4);
+  color: #9ecbff;
+}
+
+.repo-stats {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.repo-push {
+  min-width: 74px;
+  text-align: right;
+}
+
+.repo-empty {
+  text-align: center;
+  padding: 20px;
+}
+
 /* ---------- responsive ---------- */
 @media (max-width: 640px) {
   .app {
@@ -360,5 +731,8 @@ code {
   }
   .tab-item {
     flex: 1 1 40%;
+  }
+  .repo-stats {
+    display: none;
   }
 }

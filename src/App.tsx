@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import CrawlBanner from './components/CrawlBanner'
 import TokenGate from './components/TokenGate'
 import { useAppStore } from './state/AppStore'
 import OverviewTab from './tabs/OverviewTab'
@@ -56,6 +57,7 @@ export default function App() {
         <TokenGate onSignIn={signIn} />
       ) : (
         <>
+          <CrawlBanner />
           <nav className="tab-bar" aria-label="分析分区">
             {TABS.map((t) => (
               <button
