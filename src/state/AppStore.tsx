@@ -10,7 +10,7 @@ import {
 import type { ReactNode } from 'react'
 import { GitCodeClient, apiErrorMessage, isApiError } from '../api/client'
 import type { GitCodeUser } from '../api/types'
-import { crawlAccount, fetchEventsYear } from '../lib/crawler'
+import { crawlAccount, deepCrawlCommits, fetchEventsYear } from '../lib/crawler'
 import type { CrawlProgress } from '../lib/crawler'
 import {
   AnalysisSnapshot,
@@ -34,6 +34,13 @@ export interface EventFetchState {
   error: string | null
 }
 
+export type DeepCrawlState =
+  | { kind: 'idle' }
+  | { kind: 'running'; current: number; total: number; message: string }
+  | { kind: 'done'; at: string; fetched: number }
+  | { kind: 'error'; message: string }
+  | { kind: 'aborted' }
+
 export interface AppStoreValue {
   token: string | null
   user: GitCodeUser | null
@@ -46,6 +53,8 @@ export interface AppStoreValue {
   crawl: CrawlState
   /** 某年度事件正在拉取/失败（年选择器触发的增量抓取） */
   eventFetch: EventFetchState | null
+  /** 提交级深度抓取（可选功能，逐仓库最近 100 条提交） */
+  deepCrawl: DeepCrawlState
   signIn(token: string, remember: boolean): Promise<GitCodeUser>
   signOut(): void
   getClient(): GitCodeClient
@@ -54,6 +63,9 @@ export interface AppStoreValue {
   toggleExclude(repoPath: string): void
   /** 拉取某一年事件并并入快照（已有或不可用则跳过） */
   fetchYear(year: number): Promise<void>
+  /** 深度抓取最近提交（增量：已抓过的仓库跳过） */
+  startDeepCrawl(): void
+  abortDeepCrawl(): void
 }
 
 const AppStoreContext = createContext<AppStoreValue | null>(null)
@@ -73,13 +85,17 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [snapshotSaveFailed, setSnapshotSaveFailed] = useState(false)
   const [crawl, setCrawl] = useState<CrawlState>({ kind: 'idle' })
   const [eventFetch, setEventFetch] = useState<EventFetchState | null>(null)
+  const [deepCrawl, setDeepCrawl] = useState<DeepCrawlState>({ kind: 'idle' })
 
   const clientRef = useRef<{ token: string; client: GitCodeClient } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const deepAbortRef = useRef<AbortController | null>(null)
+  const deepKindRef = useRef<DeepCrawlState['kind']>('idle')
   const crawlKindRef = useRef<CrawlState['kind']>('idle')
   const snapshotRef = useRef<AnalysisSnapshot | null>(null)
 
   crawlKindRef.current = crawl.kind
+  deepKindRef.current = deepCrawl.kind
   snapshotRef.current = snapshot
 
   const getClient = useCallback((): GitCodeClient => {
@@ -120,6 +136,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           eventsByYear: result.eventsByYear,
           excludedRepos: excluded,
           eventsUnavailable: result.eventsUnavailable,
+          // 同账号重新抓取时保留已深度抓取的提交（新增仓库可再增量补抓）
+          commitsRecentByRepo:
+            prev && prev.login === result.user.login
+              ? prev.commitsRecentByRepo
+              : undefined,
         }
         const ok = saveSnapshot(snap)
         setSnapshotSaveFailed(!ok)
@@ -188,6 +209,50 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     [token, getClient, commitSnapshot],
   )
 
+  const startDeepCrawl = useCallback(() => {
+    const snap = snapshotRef.current
+    if (!snap || !token) return
+    if (deepKindRef.current === 'running') return
+    const skip = new Set(Object.keys(snap.commitsRecentByRepo ?? {}))
+    const controller = new AbortController()
+    deepAbortRef.current = controller
+    setDeepCrawl({ kind: 'running', current: 0, total: 0, message: '准备深度抓取…' })
+    deepCrawlCommits(getClient(), snap.repos, {
+      skip,
+      signal: controller.signal,
+      onProgress: ({ current, total, message }) =>
+        setDeepCrawl({ kind: 'running', current, total, message }),
+    })
+      .then((result) => {
+        const prev = snapshotRef.current
+        if (!prev) return
+        const merged: AnalysisSnapshot = {
+          ...prev,
+          commitsRecentByRepo: {
+            ...(prev.commitsRecentByRepo ?? {}),
+            ...result.commitsByRepo,
+          },
+        }
+        commitSnapshot(merged)
+        setDeepCrawl({
+          kind: 'done',
+          at: new Date().toISOString(),
+          fetched: Object.keys(result.commitsByRepo).length,
+        })
+      })
+      .catch((err: unknown) => {
+        if (isAbort(err)) {
+          setDeepCrawl({ kind: 'aborted' })
+        } else {
+          setDeepCrawl({ kind: 'error', message: apiErrorMessage(err) })
+        }
+      })
+  }, [token, getClient, commitSnapshot])
+
+  const abortDeepCrawl = useCallback(() => {
+    deepAbortRef.current?.abort()
+  }, [])
+
   const signIn = useCallback(
     async (inputToken: string, remember: boolean): Promise<GitCodeUser> => {
       const client = new GitCodeClient(inputToken)
@@ -207,6 +272,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(() => {
     abortRef.current?.abort()
+    deepAbortRef.current?.abort()
     clearRememberedToken()
     clearSnapshot()
     setRemembered(false)
@@ -216,6 +282,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setSnapshotSaveFailed(false)
     setCrawl({ kind: 'idle' })
     setEventFetch(null)
+    setDeepCrawl({ kind: 'idle' })
   }, [])
 
   // 登录后：没有可复用快照时自动开抓（切换账号时先清掉旧快照）
@@ -272,6 +339,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       snapshotSaveFailed,
       crawl,
       eventFetch,
+      deepCrawl,
       signIn,
       signOut,
       getClient,
@@ -279,6 +347,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       abortCrawl,
       toggleExclude,
       fetchYear,
+      startDeepCrawl,
+      abortDeepCrawl,
     }),
     [
       token,
@@ -289,6 +359,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       snapshotSaveFailed,
       crawl,
       eventFetch,
+      deepCrawl,
       signIn,
       signOut,
       getClient,
@@ -296,6 +367,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       abortCrawl,
       toggleExclude,
       fetchYear,
+      startDeepCrawl,
+      abortDeepCrawl,
     ],
   )
 

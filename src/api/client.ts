@@ -7,7 +7,7 @@
  * - 中断：全链路透传 AbortSignal
  */
 import { RateLimiter, sleepAbort } from '../lib/rateLimiter'
-import type { GitCodeRepo, GitCodeUser, RawGitCodeEvent } from './types'
+import type { DeepCommitLite, GitCodeRepo, GitCodeUser, RawGitCodeEvent } from './types'
 
 export const GITCODE_API_BASE = 'https://api.gitcode.com/api/v5'
 export const TOKEN_CREATE_URL = 'https://gitcode.com/setting/token-classic'
@@ -249,6 +249,21 @@ export class GitCodeClient {
       signal,
     )
   }
+
+  /** 仓库提交列表（单页；per_page 上限 100）。深度抓取用 */
+  async listRepoCommits(
+    owner: string,
+    repo: string,
+    opts: { page?: number; perPage?: number } = {},
+    signal?: AbortSignal,
+  ): Promise<unknown> {
+    const { page = 1, perPage = 100 } = opts
+    return this.get<unknown>(
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits`,
+      { page, per_page: perPage },
+      signal,
+    )
+  }
 }
 
 // ---------- events 归一化（纯函数，供单测） ----------
@@ -289,4 +304,30 @@ export function normalizeEventsPage(raw: unknown): NormalizedEventsPage {
     return { byDate, next }
   }
   return { byDate: {}, next: undefined }
+}
+
+/** 归一化最近提交为精简记录（sha 截 7 位、message 截 80 字符，取作者时间优先） */
+export function normalizeDeepCommits(raw: unknown): DeepCommitLite[] {
+  if (!Array.isArray(raw)) return []
+  const out: DeepCommitLite[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const c = item as {
+      sha?: unknown
+      commit?: {
+        author?: { date?: unknown }
+        committer?: { date?: unknown }
+        message?: unknown
+      } | null
+    }
+    const sha = typeof c.sha === 'string' ? c.sha.slice(0, 7) : ''
+    const date =
+      (typeof c.commit?.author?.date === 'string' && c.commit.author.date) ||
+      (typeof c.commit?.committer?.date === 'string' && c.commit.committer.date) ||
+      ''
+    const message = typeof c.commit?.message === 'string' ? c.commit.message : ''
+    if (!sha && !date) continue
+    out.push({ sha, date, message: message.replace(/\s+/g, ' ').trim().slice(0, 80) })
+  }
+  return out
 }

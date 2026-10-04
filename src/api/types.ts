@@ -63,3 +63,13 @@ export interface AccountEvent {
   commitCount: number
   createdAt: string | null
 }
+
+/** 深度抓取的提交精简记录（每仓库最近 N 条） */
+export interface DeepCommitLite {
+  /** 提交 SHA（截断 7 位） */
+  sha: string
+  /** 作者时间（ISO） */
+  date: string
+  /** 提交信息（截断） */
+  message: string
+}

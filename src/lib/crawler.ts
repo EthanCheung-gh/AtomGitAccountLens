@@ -2,9 +2,15 @@
  * 抓取管线：用户 → 仓库（分页）→ 逐仓库语言 → 年度事件。
  * 进度回调 + AbortSignal 全链路可中断；单仓库失败不炸整体。
  */
-import { isApiError, normalizeEventsPage } from '../api/client'
+import { isApiError, normalizeDeepCommits, normalizeEventsPage } from '../api/client'
 import type { GitCodeClient } from '../api/client'
-import type { AccountEvent, GitCodeRepo, GitCodeUser, RawGitCodeEvent } from '../api/types'
+import type {
+  AccountEvent,
+  DeepCommitLite,
+  GitCodeRepo,
+  GitCodeUser,
+  RawGitCodeEvent,
+} from '../api/types'
 import { repoOwnerName, repoPath } from './aggregate'
 
 export type CrawlPhase = 'repos' | 'languages' | 'events'
@@ -164,4 +170,53 @@ export async function crawlAccount(
   }
 
   return { user, repos, languagesByRepo, eventsByYear, eventsUnavailable }
+}
+
+export interface DeepCrawlResult {
+  commitsByRepo: Record<string, DeepCommitLite[]>
+  /** 拉取失败（非 404、非中断）的仓库数 */
+  failedCount: number
+}
+
+/**
+ * 深度抓取：逐仓库拉最近 100 条提交（每仓库 1 次请求）。
+ * skip 中的仓库不再重复拉（增量）；404/私有受限仓库记空表继续。
+ */
+export async function deepCrawlCommits(
+  client: GitCodeClient,
+  repos: GitCodeRepo[],
+  opts: {
+    skip?: Set<string>
+    onProgress?: (p: CrawlProgress) => void
+    signal?: AbortSignal
+  } = {},
+): Promise<DeepCrawlResult> {
+  const { onProgress, signal } = opts
+  const skip = opts.skip ?? new Set<string>()
+  const targets = repos.filter((r) => {
+    const path = repoPath(r)
+    return path !== '' && !skip.has(path) && repoOwnerName(r) !== null
+  })
+  const commitsByRepo: Record<string, DeepCommitLite[]> = {}
+  let failedCount = 0
+  for (let i = 0; i < targets.length; i++) {
+    const repo = targets[i]
+    const path = repoPath(repo)
+    const ownerName = repoOwnerName(repo)!
+    onProgress?.({
+      phase: 'events',
+      current: i + 1,
+      total: targets.length,
+      message: `深度抓取提交（${i + 1}/${targets.length}）${path}`,
+    })
+    try {
+      const raw = await client.listRepoCommits(ownerName.owner, ownerName.repo, {}, signal)
+      commitsByRepo[path] = normalizeDeepCommits(raw)
+    } catch (err) {
+      if (isApiError(err, 'aborted')) throw err
+      commitsByRepo[path] = []
+      if (!isApiError(err, 'notFound')) failedCount += 1
+    }
+  }
+  return { commitsByRepo, failedCount }
 }

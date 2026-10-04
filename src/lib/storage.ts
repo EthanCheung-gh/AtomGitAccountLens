@@ -2,7 +2,7 @@
  * localStorage 封装：令牌「记住本设备」（可选）与分析结果快照（不含令牌）。
  * Storage 可注入，便于单测。
  */
-import type { AccountEvent, GitCodeRepo, GitCodeUser } from '../api/types'
+import type { AccountEvent, DeepCommitLite, GitCodeRepo, GitCodeUser } from '../api/types'
 
 const TOKEN_KEY = 'agl:token'
 const SNAPSHOT_KEY = 'agl:snapshot:v1'
@@ -71,6 +71,8 @@ export interface AnalysisSnapshot {
   excludedRepos: string[]
   /** events 拉取失败的年份 → 原因（'scope' | 'error'） */
   eventsUnavailable?: Record<string, 'scope' | 'error'>
+  /** 深度抓取：repoPath → 最近提交（可选，用户手动触发后填充） */
+  commitsRecentByRepo?: Record<string, DeepCommitLite[]>
 }
 
 function isSnapshot(value: unknown): value is AnalysisSnapshot {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ApiError, apiErrorMessage, normalizeEventsPage } from './client'
+import { ApiError, apiErrorMessage, normalizeDeepCommits, normalizeEventsPage } from './client'
 
 describe('normalizeEventsPage', () => {
   it('日期键对象 + next 游标', () => {
@@ -29,6 +29,41 @@ describe('normalizeEventsPage', () => {
     expect(normalizeEventsPage(null)).toEqual({ byDate: {}, next: undefined })
     expect(normalizeEventsPage(42)).toEqual({ byDate: {}, next: undefined })
     expect(normalizeEventsPage({ foo: 'bar' }).byDate).toEqual({})
+  })
+})
+
+describe('normalizeDeepCommits', () => {
+  it('归一化：sha 截 7 位、message 压空白截 80、作者时间优先', () => {
+    const raw = [
+      {
+        sha: 'abcdef1234567890',
+        commit: {
+          author: { date: '2026-01-05T10:00:00+08:00' },
+          committer: { date: '2026-01-06T10:00:00+08:00' },
+          message: 'fix:  something\n\nbody',
+        },
+      },
+      {
+        sha: 'short',
+        commit: { committer: { date: '2026-02-01T00:00:00Z' }, message: 'x'.repeat(120) },
+      },
+      null,
+      { nothing: true },
+    ]
+    const out = normalizeDeepCommits(raw)
+    expect(out).toHaveLength(2)
+    expect(out[0]).toEqual({
+      sha: 'abcdef1',
+      date: '2026-01-05T10:00:00+08:00',
+      message: 'fix: something body',
+    })
+    expect(out[1].date).toBe('2026-02-01T00:00:00Z')
+    expect(out[1].message).toHaveLength(80)
+  })
+
+  it('非数组输入返回空', () => {
+    expect(normalizeDeepCommits(null)).toEqual([])
+    expect(normalizeDeepCommits({})).toEqual([])
   })
 })
 
