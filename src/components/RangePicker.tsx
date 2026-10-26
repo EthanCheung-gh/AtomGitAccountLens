@@ -24,7 +24,8 @@ const STATUS_LABEL: Record<string, string> = {
  * 区间覆盖的年份若未抓取，由 store 自动补抓并在下方显示进度。
  */
 export default function RangePicker() {
-  const { range, setRange, snapshot, backfill, refreshRange } = useAppStore()
+  const { range, setRange, snapshot, backfill, refreshRange, probe, probeEvents } =
+    useAppStore()
 
   /** 「全部」的左端：账号创建日与已抓到的最早事件取较小者 */
   const earliest = useMemo(() => {
@@ -154,7 +155,21 @@ export default function RangePicker() {
           <button type="button" className="btn" onClick={refreshRange}>
             重新抓取区间
           </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => void probeEvents(problems[0].year)}
+            title="直接请求该年 events 接口并显示原始响应结构，用来判断是平台没数据还是解析不上"
+          >
+            探测 {problems[0].year} 接口
+          </button>
         </div>
+      )}
+
+      {probe && (
+        <p className="range-probe">
+          接口探测（{probe.year} 年）：{probe.summary}
+        </p>
       )}
     </div>
   )

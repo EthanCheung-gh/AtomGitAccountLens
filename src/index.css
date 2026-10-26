@@ -1371,3 +1371,11 @@ code {
     display: none;
   }
 }
+
+.range-probe {
+  margin: 0;
+  font-size: 11px;
+  color: var(--accent-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}

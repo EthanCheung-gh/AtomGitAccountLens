@@ -17,7 +17,7 @@ import {
   summarizeEvents,
   weekdayHourMatrix,
 } from '../lib/aggregate'
-import { formatRangeLabel, rangeYears } from '../lib/range'
+import { formatRangeLabel, rangeYears, yearStatuses } from '../lib/range'
 import { collectEvents } from '../lib/range'
 import { formatCount } from '../lib/format'
 import { chart, palette } from '../theme'
@@ -49,6 +49,12 @@ export default function ActivityTab() {
       years.every((y) => snapshot.eventsUnavailable?.[String(y)] === 'scope')
     )
   }, [range, snapshot, events.length])
+
+  /** 区间内每一年都是「平台返回 0 条」：说明 events 侧确实没有记录 */
+  const allEmptyEvents = useMemo(() => {
+    const st = yearStatuses(range, snapshot?.eventsByYear, snapshot?.eventsUnavailable)
+    return st.length > 0 && st.every((x) => x.kind === 'empty')
+  }, [range, snapshot])
 
   // 所有 hooks 必须在条件 return 之前（React 规则）
   const summary = useMemo(() => summarizeEvents(events), [events])
@@ -386,7 +392,11 @@ export default function ActivityTab() {
           <>
             <EmptyState
               title={`${rangeLabel}没有动态数据`}
-              hint="换个区间试试，或先用深度抓取做提交级分析。"
+              hint={
+                allEmptyEvents
+                  ? '平台 events 接口对该区间返回 0 条。该接口只记录平台侧的动态（私有仓库活动可能不在其中）；提交级数据不受影响，可用下方「深度抓取」做分析。'
+                  : '换个区间试试，或先用深度抓取做提交级分析。'
+              }
             />
             <div className="card chart-card">
               <h3>深度抓取（提交级数据，不依赖动态权限）</h3>

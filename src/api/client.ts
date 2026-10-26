@@ -275,35 +275,118 @@ export interface NormalizedEventsPage {
   next: string | undefined
 }
 
+/** 判定一个对象像不像事件（有可解析的 created_at 才能分组） */
+function looksLikeEvent(item: unknown): boolean {
+  if (!item || typeof item !== 'object') return false
+  const e = item as Record<string, unknown>
+  return typeof e.created_at === 'string' && e.created_at.length >= 10
+}
+
+/**
+ * 深度兜底：不假设响应形状，递归收集所有「看起来像事件」的对象。
+ * GitCode 的 events 分页结构在文档里并不稳定（可能是日期键、月键、items 包裹、
+ * data 包裹等），与其逐个猜，不如扫一遍再按 created_at 分组。
+ */
+function deepCollectEvents(raw: unknown, maxDepth = 5): RawGitCodeEvent[] {
+  const out: RawGitCodeEvent[] = []
+  const seen = new Set<object>()
+
+  const visit = (node: unknown, depth: number) => {
+    if (depth > maxDepth || node === null || typeof node !== 'object') return
+    if (seen.has(node as object)) return
+    seen.add(node as object)
+    if (Array.isArray(node)) {
+      for (const item of node.slice(0, 300)) {
+        if (looksLikeEvent(item)) out.push(item as RawGitCodeEvent)
+        else visit(item, depth + 1)
+      }
+      return
+    }
+    if (looksLikeEvent(node)) {
+      out.push(node as RawGitCodeEvent)
+      return
+    }
+    for (const value of Object.values(node as Record<string, unknown>)) visit(value, depth + 1)
+  }
+
+  visit(raw, 0)
+  return out
+}
+
+/** 把平铺事件数组按 created_at 分组到日期 */
+function groupByDate(list: unknown[]): Record<string, RawGitCodeEvent[]> {
+  const byDate: Record<string, RawGitCodeEvent[]> = {}
+  for (const item of list) {
+    const e = item as RawGitCodeEvent
+    const date = typeof e.created_at === 'string' ? e.created_at.slice(0, 10) : ''
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue
+    ;(byDate[date] ??= []).push(e)
+  }
+  return byDate
+}
+
 export function normalizeEventsPage(raw: unknown): NormalizedEventsPage {
   if (Array.isArray(raw)) {
-    // 兜底：平铺事件数组（按 created_at 分组到日期）
-    const byDate: Record<string, RawGitCodeEvent[]> = {}
-    for (const item of raw) {
-      const e = item as RawGitCodeEvent
-      const date = typeof e.created_at === 'string' ? e.created_at.slice(0, 10) : ''
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue
-      ;(byDate[date] ??= []).push(e)
-    }
-    return { byDate, next: undefined }
+    const direct = groupByDate(raw)
+    if (Object.keys(direct).length > 0) return { byDate: direct, next: undefined }
+    return { byDate: groupByDate(deepCollectEvents(raw)), next: undefined }
   }
   if (raw && typeof raw === 'object') {
     const byDate: Record<string, RawGitCodeEvent[]> = {}
     let next: string | undefined
-    for (const [key, value] of Object.entries(
-      raw as Record<string, unknown>,
-    )) {
-      if (key === 'next') {
+    /** 兜底：事件数组被包在某个字段里（items / data / 月键等），先全收再按 created_at 分组 */
+    const looseLists: unknown[] = []
+
+    for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+      if (key === 'next' || key === 'prev' || key === 'last_id') {
         if (typeof value === 'string' && value) next = value
         continue
       }
       if (/^\d{4}-\d{2}-\d{2}$/.test(key) && Array.isArray(value)) {
         byDate[key] = value as RawGitCodeEvent[]
+        continue
       }
+      if (Array.isArray(value) && value.some(looksLikeEvent)) {
+        looseLists.push(...value)
+        continue
+      }
+      // 再深一层：字段本身是「日期键对象」
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        for (const [k2, v2] of Object.entries(value as Record<string, unknown>)) {
+          if (/^\d{4}-\d{2}-\d{2}$/.test(k2) && Array.isArray(v2)) {
+            byDate[k2] = v2 as RawGitCodeEvent[]
+          }
+        }
+      }
+    }
+
+    if (Object.keys(byDate).length === 0 && looseLists.length > 0) {
+      return { byDate: groupByDate(looseLists), next }
+    }
+    if (Object.keys(byDate).length === 0) {
+      // 最后兜底：形状未知时深度扫描（含按「YYYY-MM」月键分组、多层包裹等情况）
+      const deep = deepCollectEvents(raw)
+      if (deep.length > 0) return { byDate: groupByDate(deep), next }
     }
     return { byDate, next }
   }
   return { byDate: {}, next: undefined }
+}
+
+/** 描述未知响应形状（用于接口诊断，不含任何凭证） */
+export function describeEventsResponse(raw: unknown): string {
+  if (raw === null) return 'null'
+  if (Array.isArray(raw)) {
+    const first = raw[0]
+    const keys = first && typeof first === 'object' ? Object.keys(first).slice(0, 8).join(',') : '-'
+    return `数组 ${raw.length} 项 · 元素字段 ${keys}`
+  }
+  if (typeof raw === 'object') {
+    const keys = Object.keys(raw as Record<string, unknown>)
+    const preview = keys.slice(0, 8).join(',')
+    return `对象 ${keys.length} 个键 · ${preview}${keys.length > 8 ? '…' : ''}`
+  }
+  return typeof raw
 }
 
 /** 归一化最近提交为精简记录（sha 截 7 位、message 截 80 字符，取作者时间优先，附作者登录名） */

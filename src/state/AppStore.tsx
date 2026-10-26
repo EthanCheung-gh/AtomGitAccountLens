@@ -8,7 +8,13 @@ import {
   useState,
 } from 'react'
 import type { ReactNode } from 'react'
-import { GitCodeClient, apiErrorMessage, isApiError } from '../api/client'
+import {
+  GitCodeClient,
+  apiErrorMessage,
+  describeEventsResponse,
+  isApiError,
+  normalizeEventsPage,
+} from '../api/client'
 import type { GitCodeUser } from '../api/types'
 import { crawlAccount, deepCrawlCommits, fetchEventsYear } from '../lib/crawler'
 import type { CrawlProgress, DeepCrawlScope } from '../lib/crawler'
@@ -36,6 +42,12 @@ export type CrawlState =
 export interface EventFetchState {
   year: number
   error: string | null
+}
+
+/** 接口探测结果：某年 events 响应的真实形状（诊断用） */
+export interface ProbeState {
+  year: number
+  summary: string
 }
 
 /** 区间补抓进度：缺哪几年、抓到第几年、哪些年份平台返回 0 条 */
@@ -76,6 +88,10 @@ export interface AppStoreValue {
   backfill: BackfillState | null
   /** 强制重抓区间内的动态（清掉「平台 0 条」与空表后重抓） */
   refreshRange(): void
+  /** 最近一次接口探测结果（未探测为 null） */
+  probe: ProbeState | null
+  /** 探测某年 events 的原始响应形状，用于判断「0 条」是平台无数据还是解析不上 */
+  probeEvents(year: number): Promise<void>
   signIn(token: string, remember: boolean): Promise<GitCodeUser>
   signOut(): void
   getClient(): GitCodeClient
@@ -123,6 +139,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [deepScope, setDeepScope] = useState<DeepCrawlScope>('personal')
   const [range, setRangeState] = useState<DateRange>(() => loadRange() ?? presetRange('12m'))
   const [backfill, setBackfill] = useState<BackfillState | null>(null)
+  const [probe, setProbe] = useState<ProbeState | null>(null)
 
   const clientRef = useRef<{ token: string; client: GitCodeClient } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -349,6 +366,26 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     if (todo.length > 0) void backfillYears(todo)
   }, [token, commitSnapshot, backfillYears])
 
+  const probeEvents = useCallback(
+    async (year: number) => {
+      const snap = snapshotRef.current
+      if (!snap || !token) return
+      try {
+        const raw = await getClient().listUserEvents(snap.login, year)
+        const page = normalizeEventsPage(raw)
+        const days = Object.keys(page.byDate).length
+        const events = Object.values(page.byDate).reduce((n, list) => n + list.length, 0)
+        setProbe({
+          year,
+          summary: `${describeEventsResponse(raw)} · 解析出 ${days} 天 / ${events} 条`,
+        })
+      } catch (err) {
+        setProbe({ year, summary: `请求失败：${apiErrorMessage(err)}` })
+      }
+    },
+    [token, getClient],
+  )
+
   const setRange = useCallback((next: DateRange) => {
     rangeRef.current = next
     setRangeState(next)
@@ -532,6 +569,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setRange,
       backfill,
       refreshRange,
+      probe,
+      probeEvents,
       signIn,
       signOut,
       getClient,
@@ -559,6 +598,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setRange,
       backfill,
       refreshRange,
+      probe,
+      probeEvents,
       signIn,
       signOut,
       getClient,

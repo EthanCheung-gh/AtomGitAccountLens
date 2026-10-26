@@ -17,7 +17,7 @@ import {
   summarizeEvents,
 } from '../lib/aggregate'
 import { formatCount, formatDate } from '../lib/format'
-import { collectEvents, formatRangeLabel, rangeYears } from '../lib/range'
+import { collectEvents, formatRangeLabel, rangeYears, yearStatuses } from '../lib/range'
 import { chart, palette } from '../theme'
 
 
@@ -39,6 +39,11 @@ export default function ReportTab() {
       years.every((y) => snapshot.eventsUnavailable?.[String(y)] === 'scope')
     )
   }, [range, snapshot, events.length])
+
+  const allEmptyEvents = useMemo(() => {
+    const st = yearStatuses(range, snapshot?.eventsByYear, snapshot?.eventsUnavailable)
+    return st.length > 0 && st.every((x) => x.kind === 'empty')
+  }, [range, snapshot])
 
   const summary = useMemo(() => summarizeEvents(events), [events])
   const languages = useMemo(() => {
@@ -124,7 +129,14 @@ export default function ReportTab() {
         loading ? (
           <EmptyState title={`正在补抓 ${backfill?.current ?? ''} 年动态…`} />
         ) : (
-          <EmptyState title={`${rangeLabel}没有动态数据`} hint="换个区间试试。" />
+          <EmptyState
+            title={`${rangeLabel}没有动态数据`}
+            hint={
+              allEmptyEvents
+                ? '平台 events 接口对该区间返回 0 条（该接口只记录平台侧动态，私有仓库活动可能不在其中）。提交级数据在「活跃度」页的深度抓取里，不受此限制。'
+                : '换个区间试试。'
+            }
+          />
         )
       ) : (
         <>
