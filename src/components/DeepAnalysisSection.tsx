@@ -119,7 +119,7 @@ export default function DeepAnalysisSection() {
         {
           type: 'bar',
           data: hourHist,
-          itemStyle: { color: palette.accent3, borderRadius: [3, 3, 0, 0] },
+          itemStyle: { color: palette.accent, borderRadius: [3, 3, 0, 0] },
         },
       ],
     }),
@@ -174,7 +174,7 @@ export default function DeepAnalysisSection() {
         {
           type: 'bar',
           data: weekday,
-          itemStyle: { color: palette.accent2, borderRadius: [3, 3, 0, 0] },
+          itemStyle: { color: palette.accent, borderRadius: [3, 3, 0, 0] },
         },
       ],
     }),
@@ -233,7 +233,7 @@ export default function DeepAnalysisSection() {
         {
           type: 'bar',
           data: items.map((t) => t.count).reverse(),
-          itemStyle: { color: palette.accent2, borderRadius: [0, 3, 3, 0] },
+          itemStyle: { color: palette.accent, borderRadius: [0, 3, 3, 0] },
           label: { show: true, position: 'right', color: chart.axis, fontSize: 11 },
         },
       ],

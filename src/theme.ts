@@ -25,9 +25,9 @@ export const palette = {
   /** 品牌主色（柔化橙，GitCode 红橙降饱和版） */
   accent: '#ff5c33',
   /** 品牌辅助色（亮橙，用于渐变第二档、强调标签） */
-  accent2: '#ff997c',
+  accent2: '#ff8f66',
   /** 品牌浅色（文字/描边在深底上的浅橙） */
-  accent3: '#ffc9a3',
+  accent3: '#ffb894',
   /** 主色 14% 透明，用于选中态底、tag 底 */
   accentSoft: 'rgba(255, 92, 51, 0.14)',
   /** 主色 42% 透明，用于强调描边 */

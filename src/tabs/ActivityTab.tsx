@@ -156,7 +156,7 @@ export default function ActivityTab() {
         {
           type: 'bar',
           data: actions.map((a) => a.count).reverse(),
-          itemStyle: { color: palette.accent2, borderRadius: [0, 3, 3, 0] },
+          itemStyle: { color: palette.accent, borderRadius: [0, 3, 3, 0] },
           label: { show: true, position: 'right', color: chart.axis, fontSize: 11 },
         },
       ],
@@ -278,7 +278,7 @@ export default function ActivityTab() {
         {
           type: 'bar',
           data: pushSizes.buckets.map((b) => b.count),
-          itemStyle: { color: palette.accent2, borderRadius: [3, 3, 0, 0] },
+          itemStyle: { color: palette.accent, borderRadius: [3, 3, 0, 0] },
         },
       ],
     }),

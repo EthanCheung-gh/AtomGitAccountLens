@@ -260,7 +260,7 @@ export default function ReposTab() {
           type: 'bar',
           yAxisIndex: 1,
           data: items.map((n) => n.commits),
-          itemStyle: { color: palette.accent2, borderRadius: [3, 3, 0, 0] },
+          itemStyle: { color: palette.accent, borderRadius: [3, 3, 0, 0] },
         },
       ],
     }
