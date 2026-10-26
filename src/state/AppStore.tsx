@@ -12,12 +12,16 @@ import { GitCodeClient, apiErrorMessage, isApiError } from '../api/client'
 import type { GitCodeUser } from '../api/types'
 import { crawlAccount, deepCrawlCommits, fetchEventsYear } from '../lib/crawler'
 import type { CrawlProgress, DeepCrawlScope } from '../lib/crawler'
+import { missingYears, presetRange } from '../lib/range'
+import type { DateRange } from '../lib/range'
 import {
   AnalysisSnapshot,
   clearRememberedToken,
   clearSnapshot,
+  loadRange,
   loadRememberedToken,
   loadSnapshot,
+  saveRange,
   saveRememberedToken,
   saveSnapshot,
 } from '../lib/storage'
@@ -31,6 +35,14 @@ export type CrawlState =
 
 export interface EventFetchState {
   year: number
+  error: string | null
+}
+
+/** 区间补抓进度：缺哪几年、抓到第几年 */
+export interface BackfillState {
+  years: number[]
+  done: number
+  current: number | null
   error: string | null
 }
 
@@ -55,6 +67,11 @@ export interface AppStoreValue {
   eventFetch: EventFetchState | null
   /** 提交级深度抓取（可选功能，逐仓库最近 100 条提交） */
   deepCrawl: DeepCrawlState
+  /** 全站时间区间（活跃度与年报共用，非自然年可选） */
+  range: DateRange
+  setRange(range: DateRange): void
+  /** 区间覆盖年份的自动补抓进度（无缺失为 null） */
+  backfill: BackfillState | null
   signIn(token: string, remember: boolean): Promise<GitCodeUser>
   signOut(): void
   getClient(): GitCodeClient
@@ -92,6 +109,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [eventFetch, setEventFetch] = useState<EventFetchState | null>(null)
   const [deepCrawl, setDeepCrawl] = useState<DeepCrawlState>({ kind: 'idle' })
   const [deepScope, setDeepScope] = useState<DeepCrawlScope>('personal')
+  const [range, setRangeState] = useState<DateRange>(() => loadRange() ?? presetRange('12m'))
+  const [backfill, setBackfill] = useState<BackfillState | null>(null)
 
   const clientRef = useRef<{ token: string; client: GitCodeClient } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -100,11 +119,16 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const deepScopeRef = useRef<DeepCrawlScope>('personal')
   const crawlKindRef = useRef<CrawlState['kind']>('idle')
   const snapshotRef = useRef<AnalysisSnapshot | null>(null)
+  const rangeRef = useRef<DateRange>(range)
+  const backfillingRef = useRef(false)
+  /** 本区间内已尝试过补抓的年份（失败年份不再自动重试，避免死循环） */
+  const attemptedYearsRef = useRef<Set<number>>(new Set())
 
   crawlKindRef.current = crawl.kind
   deepKindRef.current = deepCrawl.kind
   deepScopeRef.current = deepScope
   snapshotRef.current = snapshot
+  rangeRef.current = range
 
   const getClient = useCallback((): GitCodeClient => {
     if (!token) throw new Error('尚未登录')
@@ -190,6 +214,35 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setSnapshot(next)
   }, [])
 
+  /** 拉取单年事件并写入快照；已抓/已确认无权限的年份直接视为完成 */
+  const fetchYearInto = useCallback(
+    async (year: number): Promise<{ status: 'ok' | 'scope' | 'error'; message?: string }> => {
+      const snap = snapshotRef.current
+      if (!snap || !token) return { status: 'error', message: '尚未登录' }
+      const key = String(year)
+      if (snap.eventsByYear[key] || snap.eventsUnavailable?.[key]) return { status: 'ok' }
+      const outcome = await fetchEventsYear(getClient(), snap.login, year, {})
+      const base = snapshotRef.current
+      if (!base) return outcome.status === 'ok' ? { status: 'ok' } : outcome
+      if (outcome.status === 'ok') {
+        commitSnapshot({
+          ...base,
+          eventsByYear: { ...base.eventsByYear, [key]: outcome.events },
+        })
+        return { status: 'ok' }
+      }
+      if (outcome.status === 'scope') {
+        commitSnapshot({
+          ...base,
+          eventsUnavailable: { ...(base.eventsUnavailable ?? {}), [key]: 'scope' },
+        })
+        return { status: 'scope', message: outcome.message }
+      }
+      return outcome
+    },
+    [token, getClient, commitSnapshot],
+  )
+
   const fetchYear = useCallback(
     async (year: number) => {
       const snap = snapshotRef.current
@@ -197,25 +250,50 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       const key = String(year)
       if (snap.eventsByYear[key] || snap.eventsUnavailable?.[key]) return
       setEventFetch({ year, error: null })
-      const outcome = await fetchEventsYear(getClient(), snap.login, year, {})
-      if (outcome.status === 'ok') {
-        commitSnapshot({
-          ...snap,
-          eventsByYear: { ...snap.eventsByYear, [key]: outcome.events },
-        })
-        setEventFetch(null)
-      } else if (outcome.status === 'scope') {
-        commitSnapshot({
-          ...snap,
-          eventsUnavailable: { ...(snap.eventsUnavailable ?? {}), [key]: 'scope' },
-        })
-        setEventFetch(null)
-      } else {
-        setEventFetch({ year, error: outcome.message })
+      const res = await fetchYearInto(year)
+      if (res.status === 'error') setEventFetch({ year, error: res.message ?? '拉取失败' })
+      else setEventFetch(null)
+    },
+    [token, fetchYearInto],
+  )
+
+  /** 串行补抓区间内缺失的年份，进度写入 backfill */
+  const backfillYears = useCallback(
+    async (years: number[]) => {
+      if (backfillingRef.current || years.length === 0) return
+      backfillingRef.current = true
+      setBackfill({ years, done: 0, current: years[0], error: null })
+      try {
+        for (let i = 0; i < years.length; i++) {
+          const year = years[i]
+          attemptedYearsRef.current.add(year)
+          setBackfill({ years, done: i, current: year, error: null })
+          const res = await fetchYearInto(year)
+          if (res.status === 'error') {
+            setBackfill({
+              years,
+              done: i,
+              current: null,
+              error: `${year} 年补抓失败：${res.message ?? '未知错误'}`,
+            })
+            return
+          }
+        }
+        setBackfill({ years, done: years.length, current: null, error: null })
+      } finally {
+        backfillingRef.current = false
       }
     },
-    [token, getClient, commitSnapshot],
+    [fetchYearInto],
   )
+
+  const setRange = useCallback((next: DateRange) => {
+    rangeRef.current = next
+    setRangeState(next)
+    saveRange(next)
+    attemptedYearsRef.current.clear() // 换区间允许重新尝试失败的年份
+    setBackfill(null)
+  }, [])
 
   const startDeepCrawl = useCallback(() => {
     const snap = snapshotRef.current
@@ -315,6 +393,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setCrawl({ kind: 'idle' })
     setEventFetch(null)
     setDeepCrawl({ kind: 'idle' })
+    setBackfill(null)
+    backfillingRef.current = false
+    attemptedYearsRef.current.clear()
   }, [])
 
   // 登录后：没有可复用快照时自动开抓（切换账号时先清掉旧快照）
@@ -332,6 +413,19 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       startCrawl()
     }
   }, [user, startCrawl])
+
+  // 区间覆盖到未抓取的年份时自动补抓（不与首轮抓取、已有补抓叠加）
+  useEffect(() => {
+    if (!user || !snapshot || !token) return
+    if (crawl.kind === 'running' || backfillingRef.current) return
+    const todo = missingYears(
+      range,
+      snapshot.eventsByYear,
+      snapshot.eventsUnavailable,
+    ).filter((y) => !attemptedYearsRef.current.has(y))
+    if (todo.length === 0) return
+    void backfillYears(todo)
+  }, [user, snapshot, range, crawl.kind, token, backfillYears])
 
   // 启动：若有记住的令牌，静默验证并恢复快照
   useEffect(() => {
@@ -372,6 +466,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       crawl,
       eventFetch,
       deepCrawl,
+      range,
+      setRange,
+      backfill,
       signIn,
       signOut,
       getClient,
@@ -395,6 +492,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       crawl,
       eventFetch,
       deepCrawl,
+      range,
+      setRange,
+      backfill,
       signIn,
       signOut,
       getClient,

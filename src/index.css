@@ -181,6 +181,105 @@ body {
   flex: 1;
 }
 
+/* ---------- 时间区间选择器 ---------- */
+.range-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.range-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.range-date {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 12px;
+  padding: 6px 9px;
+  color-scheme: dark;
+  outline: none;
+}
+
+.range-date:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 92, 51, 0.16);
+}
+
+.range-tilde {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.range-presets {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.range-chip {
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 11.5px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.range-chip:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.range-chip.active {
+  color: var(--accent-3);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.range-note {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 0;
+}
+
+.range-note strong {
+  color: var(--text);
+  font-weight: 600;
+  margin-left: 3px;
+}
+
+.range-busy {
+  color: var(--accent-2);
+  margin-left: 4px;
+}
+
+.range-missing {
+  color: var(--warn);
+  margin-left: 4px;
+}
+
+.range-error {
+  color: var(--danger);
+  margin-left: 4px;
+}
+
 /* ---------- 内容区页头 ---------- */
 .page-head {
   display: flex;
@@ -633,6 +732,9 @@ code {
 .stat-value {
   font-size: 24px;
   font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .stat-label {
@@ -957,6 +1059,13 @@ code {
 .deep-section-head h2 {
   margin: 0;
   font-size: 17px;
+}
+
+.deep-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .deep-section-meta {

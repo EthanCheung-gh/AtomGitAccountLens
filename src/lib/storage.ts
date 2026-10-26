@@ -3,9 +3,11 @@
  * Storage 可注入，便于单测。
  */
 import type { AccountEvent, DeepCommitLite, GitCodeRepo, GitCodeUser } from '../api/types'
+import type { DateRange } from './range'
 
 const TOKEN_KEY = 'agl:token'
 const SNAPSHOT_KEY = 'agl:snapshot:v1'
+const RANGE_KEY = 'agl:range:v1'
 
 export interface StorageLike {
   getItem(key: string): string | null
@@ -127,5 +129,36 @@ export function clearSnapshot(storage?: StorageLike | null): void {
     s?.removeItem(SNAPSHOT_KEY)
   } catch {
     /* 忽略 */
+  }
+}
+
+// ---------- 时间区间偏好 ----------
+
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/
+
+/** 读取上次使用的时间区间（非法/缺失返回 null，由调用方回落到默认预设） */
+export function loadRange(storage?: StorageLike | null): DateRange | null {
+  const s = storage ?? safeStorage()
+  if (!s) return null
+  try {
+    const raw = s.getItem(RANGE_KEY)
+    if (!raw) return null
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    const { start, end } = parsed as Partial<DateRange>
+    if (typeof start !== 'string' || typeof end !== 'string') return null
+    if (!DATE_KEY.test(start) || !DATE_KEY.test(end) || start > end) return null
+    return { start, end }
+  } catch {
+    return null
+  }
+}
+
+export function saveRange(range: DateRange, storage?: StorageLike | null): void {
+  const s = storage ?? safeStorage()
+  try {
+    s?.setItem(RANGE_KEY, JSON.stringify(range))
+  } catch {
+    /* 忽略：偏好存不下不影响分析 */
   }
 }

@@ -20,7 +20,10 @@ import {
   repoCommitTotals,
   repoCreationTimeline,
   repoFreshness,
+  monthKeysInRange,
+  peakMonthInRange,
   repoMonthlyStack,
+  repoMonthlyStackForMonths,
   topStargazed,
   weekdayHourMatrix,
 } from './aggregate'
@@ -330,5 +333,40 @@ describe('全时段提交分析（含作者过滤）', () => {
     const totals = repoCommitTotals(data, undefined)
     expect(totals[0]).toEqual({ repo: 'me/r1', count: 4 })
     expect(totals[1]).toEqual({ repo: 'me/r2', count: 1 })
+  })
+})
+
+describe('区间月度（跨年不混月）', () => {
+  const events = [
+    { date: '2025-11-05', action: 'push', repoPath: 'me/r1', commitCount: 3, createdAt: '2025-11-05T10:00:00+08:00' },
+    { date: '2026-01-04', action: 'push', repoPath: 'me/r1', commitCount: 2, createdAt: '2026-01-04T10:00:00+08:00' },
+    { date: '2026-01-09', action: 'push', repoPath: 'me/r2', commitCount: 5, createdAt: '2026-01-09T10:00:00+08:00' },
+    { date: '2026-03-01', action: 'push', repoPath: 'me/r2', commitCount: 1, createdAt: '2026-03-01T10:00:00+08:00' },
+  ]
+
+  it('monthKeysInRange 连续覆盖跨年月份', () => {
+    expect(monthKeysInRange({ start: '2025-11-20', end: '2026-02-10' })).toEqual([
+      '2025-11',
+      '2025-12',
+      '2026-01',
+      '2026-02',
+    ])
+    expect(monthKeysInRange({ start: '2026-05-01', end: '2026-05-31' })).toEqual(['2026-05'])
+  })
+
+  it('repoMonthlyStackForMonths 按区间月份对齐', () => {
+    const months = ['2025-11', '2025-12', '2026-01', '2026-02']
+    const stack = repoMonthlyStackForMonths(events, months, 5)
+    expect(stack.months).toEqual(months)
+    expect(stack.series.find((s) => s.repo === 'me/r1')?.data).toEqual([3, 0, 2, 0])
+    expect(stack.series.find((s) => s.repo === 'me/r2')?.data).toEqual([0, 0, 5, 0])
+  })
+
+  it('peakMonthInRange 带年份标签', () => {
+    expect(peakMonthInRange(events, { start: '2025-11-01', end: '2026-03-31' })).toEqual({
+      month: '2026-01',
+      commits: 7,
+    })
+    expect(peakMonthInRange(events, { start: '2025-12-01', end: '2025-12-31' })).toBeNull()
   })
 })

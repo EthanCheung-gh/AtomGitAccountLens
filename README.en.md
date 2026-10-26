@@ -38,7 +38,8 @@ GitCode's API differs from GitHub's; this project refuses to fabricate numbers:
 2. **No lines-of-code**: the API provides none, so repo and commit counts proxy scale.
 3. **Commits come from the events feed**: `/users/{login}/events?year=` (needs `read_user`); heatmap/hours/trend/report and the overview all share this source.
 4. **Followers are counts only** (the followers-list endpoint is unavailable on the GitCode host).
-5. **Repo exclusion**: exclusions in the Repo Portrait apply to Overview, Activity and Annual Report alike.
+5. **Repo exclusion**: exclusions in the Repo Portrait apply to Overview, Activity and Range Report alike.
+6. **Time ranges (not just calendar years)**: Activity and Range Report share one start/end date picker (last 7/30/90 days, last 12 months, this quarter, this year, all, or any custom dates). The events endpoint only paginates by year + `next` cursor, so every year the range touches must already be crawled — missing years are backfilled automatically (a full year at a time, with progress shown under the picker). Commit-level data is crawled for all history and is simply filtered by the range. Monthly charts in cross-year ranges label buckets as `YY-MM` instead of `month N` so the same month in different years never merges.
 
 ## GitCode & AtomGit
 

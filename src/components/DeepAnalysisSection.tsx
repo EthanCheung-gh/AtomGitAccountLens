@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { EChartsOption } from 'echarts'
+import DeepCrawlControls from './DeepCrawlControls'
 import EChart from './EChart'
 import { useAppStore } from '../state/AppStore'
 import {
@@ -14,6 +15,7 @@ import {
   repoCommitTotals,
 } from '../lib/aggregate'
 import { formatCount, formatDate, formatDateTime } from '../lib/format'
+import { formatRangeLabel, inRange } from '../lib/range'
 import { chart, palette } from '../theme'
 
 const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
@@ -67,11 +69,24 @@ function heatmapOption(matrix: number[][], unit: string): EChartsOption {
   }
 }
 
-/** 提交级深度分析：全时段提交数据的图表套件（样本 > 0 时渲染） */
+/** 提交级深度分析：提交样本按当前时间区间过滤后的图表套件（样本 > 0 时渲染） */
 export default function DeepAnalysisSection() {
-  const { snapshot } = useAppStore()
+  const { snapshot, range } = useAppStore()
   const [ownOnly, setOwnOnly] = useState(true)
-  const commits = snapshot?.commitsRecentByRepo
+  const raw = snapshot?.commitsRecentByRepo
+  /**
+   * 按区间裁剪提交样本。深度抓取本身是全时段的，这里只是按页面区间切片，
+   * 抓到的原始数据不动，切回大区间立刻还原。
+   */
+  const commits = useMemo(() => {
+    if (!raw) return undefined
+    const out: Record<string, typeof raw[string]> = {}
+    for (const [repo, list] of Object.entries(raw)) {
+      const kept = list.filter((c) => inRange(c.date, range))
+      if (kept.length > 0) out[repo] = kept
+    }
+    return out
+  }, [raw, range])
   const login = ownOnly ? snapshot?.login : undefined
 
   const meta = useMemo(() => deepCommitMeta(commits), [commits])
@@ -258,8 +273,9 @@ export default function DeepAnalysisSection() {
   return (
     <section className="deep-section">
       <div className="deep-section-head">
-        <h2>提交级深度分析（全时段）</h2>
-        <div className="calibre-toggle" role="group" aria-label="提交作者过滤">
+        <h2>提交级深度分析（{formatRangeLabel(range)}）</h2>
+        <div className="deep-head-actions">
+          <div className="calibre-toggle" role="group" aria-label="提交作者过滤">
           <button
             type="button"
             className={ownOnly ? 'active' : ''}
@@ -274,6 +290,8 @@ export default function DeepAnalysisSection() {
           >
             全部作者
           </button>
+          </div>
+          <DeepCrawlControls />
         </div>
       </div>
       <p className="muted deep-section-meta">
@@ -283,7 +301,7 @@ export default function DeepAnalysisSection() {
       </p>
 
       <div className="card chart-card">
-        <h3>全时段月度提交时间线</h3>
+        <h3>月度提交时间线</h3>
         <EChart option={monthlyOption} height={240} />
       </div>
 
@@ -320,7 +338,7 @@ export default function DeepAnalysisSection() {
 
       <div className="chart-grid">
         <div className="card chart-card">
-          <h3>每仓库提交数 Top 10（全时段口径）</h3>
+          <h3>每仓库提交数 Top 10</h3>
           <EChart
             option={repoTotalsOption}
             height={Math.max(160, repoTotals.length * 28 + 50)}

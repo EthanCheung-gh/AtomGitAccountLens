@@ -1,56 +1,57 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { EChartsOption } from 'echarts'
 import DeepAnalysisSection from '../components/DeepAnalysisSection'
 import DeepCrawlControls from '../components/DeepCrawlControls'
 import EChart from '../components/EChart'
 import EmptyState from '../components/EmptyState'
+import RangePicker from '../components/RangePicker'
 import ScopeGuide from '../components/ScopeGuide'
 import StatCard from '../components/StatCard'
 import { useAppStore } from '../state/AppStore'
 import {
   actionBreakdown,
   cumulativeCommits,
+  monthKeysInRange,
   pushSizeStats,
-  repoMonthlyStack,
+  repoMonthlyStackForMonths,
   summarizeEvents,
   weekdayHourMatrix,
 } from '../lib/aggregate'
-import { currentYear, formatCount } from '../lib/format'
+import { formatRangeLabel, rangeYears } from '../lib/range'
+import { collectEvents } from '../lib/range'
+import { formatCount } from '../lib/format'
 import { chart, palette } from '../theme'
 
+
+/** 取 owner/repo 里的 repo 段（KPI 卡里不需要 owner 前缀） */
+function shortRepo(path: string): string {
+  const i = path.lastIndexOf('/')
+  return i >= 0 ? path.slice(i + 1) : path
+}
 
 function truncate(name: string, max = 26): string {
   return name.length > max ? `${name.slice(0, max - 1)}…` : name
 }
 
 export default function ActivityTab() {
-  const { snapshot, crawl, startCrawl, eventFetch, fetchYear } = useAppStore()
-  const [year, setYear] = useState<number>(currentYear())
+  const { snapshot, crawl, startCrawl, range, backfill } = useAppStore()
 
-  const years = useMemo<number[]>(() => {
-    if (!snapshot) return []
-    const created = snapshot.user.created_at
-      ? new Date(snapshot.user.created_at).getFullYear()
-      : currentYear()
-    const start = Math.min(created, currentYear())
-    const list: number[] = []
-    for (let y = currentYear(); y >= start; y--) list.push(y)
-    return list
-  }, [snapshot])
-
-  // 切换到未抓取的年份时增量拉取
-  useEffect(() => {
-    void fetchYear(year)
-  }, [year, fetchYear])
-
-  const yearKey = String(year)
-  const events = snapshot?.eventsByYear[yearKey]
-  const unavailable = snapshot?.eventsUnavailable?.[yearKey]
-  const loading = eventFetch?.year === year && eventFetch.error === null
-  const fetchError = eventFetch?.year === year ? eventFetch.error : null
+  const rangeLabel = formatRangeLabel(range)
+  const events = useMemo(() => collectEvents(snapshot?.eventsByYear, range), [snapshot, range])
+  const loading = backfill !== null && backfill.current !== null
+  const fetchError = backfill?.error ?? null
+  /** 区间覆盖的年份全都因权限不可用 */
+  const allScopeBlocked = useMemo(() => {
+    const years = rangeYears(range)
+    if (years.length === 0 || !snapshot) return false
+    return (
+      events.length === 0 &&
+      years.every((y) => snapshot.eventsUnavailable?.[String(y)] === 'scope')
+    )
+  }, [range, snapshot, events.length])
 
   // 所有 hooks 必须在条件 return 之前（React 规则）
-  const summary = useMemo(() => summarizeEvents(events ?? []), [events])
+  const summary = useMemo(() => summarizeEvents(events), [events])
 
   const heatmapOption = useMemo<EChartsOption>(() => {
     const data = Object.entries(summary.commitsByDate).map(([date, count]) => [date, count])
@@ -77,7 +78,7 @@ export default function ActivityTab() {
         textStyle: { color: chart.axis },
       },
       calendar: {
-        range: [`${year}-01-01`, `${year}-12-31`],
+        range: [range.start, range.end],
         cellSize: ['auto', 14],
         left: 44,
         right: 16,
@@ -101,7 +102,7 @@ export default function ActivityTab() {
         },
       ],
     }
-  }, [summary, year])
+  }, [summary, range.start, range.end])
 
   const topRepoOption = useMemo<EChartsOption>(() => {
     const top = summary.byRepo.slice(0, 10)
@@ -211,15 +212,29 @@ export default function ActivityTab() {
   }, [weekdayHour])
 
   const cumulative = useMemo(() => cumulativeCommits(events ?? []), [events])
+  const spanDays = useMemo(() => {
+    const a = new Date(`${range.start}T00:00:00`).getTime()
+    const b = new Date(`${range.end}T00:00:00`).getTime()
+    return Number.isFinite(a) && Number.isFinite(b) ? Math.max(1, Math.round((b - a) / 86400000)) : 0
+  }, [range.start, range.end])
+
   const cumulativeOption = useMemo<EChartsOption>(
     () => ({
       tooltip: { ...chart.tooltip, trigger: 'axis' },
       grid: { left: 48, right: 16, top: 18, bottom: 28 },
       xAxis: {
         type: 'time',
-        min: `${year}-01-01`,
-        max: `${year}-12-31`,
-        axisLabel: { color: chart.axis, fontSize: 11, formatter: '{MMM}' },
+        min: range.start,
+        max: range.end,
+        axisLabel: {
+          color: chart.axis,
+          fontSize: 11,
+          formatter: (value: number) => {
+            const d = new Date(value)
+            const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+            return spanDays > 90 ? ym : `${d.getMonth() + 1}/${d.getDate()}`
+          },
+        },
         axisLine: { lineStyle: { color: chart.split } },
       },
       yAxis: {
@@ -239,7 +254,7 @@ export default function ActivityTab() {
         },
       ],
     }),
-    [cumulative, year],
+    [cumulative, range.start, range.end],
   )
 
   const pushSizes = useMemo(() => pushSizeStats(events ?? []), [events])
@@ -270,7 +285,12 @@ export default function ActivityTab() {
     [pushSizes],
   )
 
-  const monthlyStack = useMemo(() => repoMonthlyStack(events ?? [], year, 5), [events, year])
+  const monthKeys = useMemo(() => monthKeysInRange(range), [range])
+  const monthAxisCrossYear = new Set(monthKeys.map((m) => m.slice(0, 4))).size > 1
+  const monthlyStack = useMemo(
+    () => repoMonthlyStackForMonths(events, monthKeys, 5),
+    [events, monthKeys],
+  )
   const monthlyStackOption = useMemo<EChartsOption>(
     () => ({
       tooltip: { ...chart.tooltip, trigger: 'axis' },
@@ -285,7 +305,9 @@ export default function ActivityTab() {
       grid: { left: 44, right: 12, top: 34, bottom: 28 },
       xAxis: {
         type: 'category',
-        data: monthlyStack.months.map((m) => m.slice(5)),
+        data: monthlyStack.months.map((m) =>
+          monthAxisCrossYear ? `${m.slice(2, 4)}-${m.slice(5)}` : m.slice(5),
+        ),
         axisLabel: { color: chart.axis, fontSize: 11 },
         axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
@@ -312,7 +334,7 @@ export default function ActivityTab() {
     return (
       <EmptyState
         title="还没有活跃度数据"
-        hint={crawl.kind === 'running' ? '正在抓取，请稍候…' : '抓取完成后这里会展示年度贡献热力图。'}
+        hint={crawl.kind === 'running' ? '正在抓取，请稍候…' : '抓取完成后这里会展示区间贡献热力图。'}
       >
         {crawl.kind !== 'running' && (
           <button type="button" className="btn primary" onClick={startCrawl}>
@@ -326,60 +348,48 @@ export default function ActivityTab() {
   return (
     <section className="activity-tab">
       <div className="activity-toolbar">
-        <label className="activity-year-label" htmlFor="activity-year">
-          年度
-        </label>
-        <select
-          id="activity-year"
-          className="input activity-year"
-          value={year}
-          onChange={(e) => setYear(Number(e.target.value))}
-        >
-          {years.map((y) => (
-            <option key={y} value={y}>
-              {y} 年
-            </option>
-          ))}
-        </select>
-        {loading && <span className="muted">正在拉取 {year} 年动态…</span>}
+        <RangePicker />
       </div>
 
       {fetchError && (
         <p className="activity-error">
-          拉取 {year} 年数据失败：{fetchError}
-          <button type="button" className="btn" onClick={() => void fetchYear(year)}>
-            重试
+          补抓区间数据失败：{fetchError}
+          <button type="button" className="btn" onClick={startCrawl}>
+            重新抓取全部
           </button>
         </p>
       )}
 
-      {unavailable === 'scope' ? (
+      {allScopeBlocked ? (
         <>
           <div className="card">
-            <h3>{year} 年动态</h3>
+            <h3>{rangeLabel}动态</h3>
             <ScopeGuide />
           </div>
           <div className="card chart-card">
-            <h3>深度抓取（提交级分析，不依赖动态权限）</h3>
+            <h3>深度抓取（提交级数据，不依赖动态权限）</h3>
             <DeepCrawlControls />
           </div>
         </>
-      ) : unavailable === 'error' ? (
+      ) : fetchError ? (
         <>
-          <EmptyState title={`${year} 年动态拉取失败`} hint="可回到仓库画像页点「重新抓取」重试。" />
+          <EmptyState title="区间动态抓取失败" hint="可回到仓库画像页点「重新抓取」重试。" />
           <div className="card chart-card">
-            <h3>深度抓取（提交级分析，不依赖动态权限）</h3>
+            <h3>深度抓取（提交级数据，不依赖动态权限）</h3>
             <DeepCrawlControls />
           </div>
         </>
       ) : !events || events.length === 0 ? (
         loading ? (
-          <EmptyState title={`正在拉取 ${year} 年动态…`} />
+          <EmptyState title={`正在补抓 ${backfill?.current ?? ''} 年动态…`} />
         ) : (
           <>
-            <EmptyState title={`${year} 年没有动态数据`} hint="换个年份试试，或先用深度抓取做提交级分析。" />
+            <EmptyState
+              title={`${rangeLabel}没有动态数据`}
+              hint="换个区间试试，或先用深度抓取做提交级分析。"
+            />
             <div className="card chart-card">
-              <h3>深度抓取（提交级分析，不依赖动态权限）</h3>
+              <h3>深度抓取（提交级数据，不依赖动态权限）</h3>
               <DeepCrawlControls />
             </div>
           </>
@@ -387,12 +397,12 @@ export default function ActivityTab() {
       ) : (
         <>
           <div className="stat-grid activity-stats">
-            <StatCard label={`${year} 年提交`} value={formatCount(summary.totalCommits)} />
+            <StatCard label="区间提交" value={formatCount(summary.totalCommits)} />
             <StatCard label="动态事件" value={formatCount(summary.totalEvents)} />
             <StatCard label="活跃天数" value={summary.activeDays} hint="有提交的日子" />
             <StatCard
               label="最活跃仓库"
-              value={summary.byRepo[0] ? truncate(summary.byRepo[0].repo, 14) : '—'}
+              value={summary.byRepo[0] ? truncate(shortRepo(summary.byRepo[0].repo), 16) : '—'}
               hint={summary.byRepo[0] ? `${formatCount(summary.byRepo[0].commits)} 次提交` : undefined}
             />
           </div>
@@ -418,7 +428,7 @@ export default function ActivityTab() {
           </div>
 
           <div className="card chart-card">
-            <h3>年度累积提交曲线</h3>
+            <h3>累积提交曲线</h3>
             <EChart option={cumulativeOption} height={230} />
           </div>
 
@@ -428,10 +438,6 @@ export default function ActivityTab() {
                 推送粒度（平均 {pushSizes.avg} 个提交/次 · 单次最大 {pushSizes.max}）
               </h3>
               <EChart option={pushOption} height={230} />
-            </div>
-            <div className="card chart-card">
-              <h3>提交级时段（深度抓取）</h3>
-              <DeepCrawlControls />
             </div>
           </div>
 

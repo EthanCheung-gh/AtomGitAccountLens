@@ -3,6 +3,7 @@
  * 全部无副作用，供各 Tab 与单测使用。
  */
 import type { AccountEvent, DeepCommitLite, GitCodeRepo } from '../api/types'
+import type { DateRange } from './range'
 
 /** 仓库规范路径 "owner/repo"（优先 path_with_namespace） */
 export function repoPath(repo: GitCodeRepo): string {
@@ -589,21 +590,17 @@ export function namespaceStats(
 }
 
 export interface RepoMonthlyStack {
-  /** YYYY-MM × 12（当年 1-12 月） */
+  /** YYYY-MM 列表（按给定月份序列） */
   months: string[]
   series: { repo: string; data: number[] }[]
 }
 
-/** Top 活跃仓库的月度提交堆叠（当年） */
-export function repoMonthlyStack(
+/** 按给定月份序列做 Top 仓库的月度提交堆叠（区间版与单年版共用） */
+export function repoMonthlyStackForMonths(
   events: AccountEvent[],
-  year: number,
+  months: string[],
   topN = 5,
 ): RepoMonthlyStack {
-  const months = Array.from(
-    { length: 12 },
-    (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`,
-  )
   const perRepo = new Map<string, number[]>()
   for (const e of events) {
     if (e.commitCount <= 0 || !e.repoPath) continue
@@ -612,7 +609,7 @@ export function repoMonthlyStack(
     if (idx < 0) continue
     let arr = perRepo.get(e.repoPath)
     if (!arr) {
-      arr = new Array(12).fill(0)
+      arr = new Array(months.length).fill(0)
       perRepo.set(e.repoPath, arr)
     }
     arr[idx] += e.commitCount
@@ -622,6 +619,58 @@ export function repoMonthlyStack(
     .sort((a, b) => b.total - a.total)
     .slice(0, topN)
   return { months, series: top.map(({ repo, data }) => ({ repo, data })) }
+}
+
+/** 区间内的月份键（YYYY-MM，连续升序；跨年也不会混月） */
+export function monthKeysInRange(range: DateRange): string[] {
+  const keys: string[] = []
+  const [sy, sm] = [Number(range.start.slice(0, 4)), Number(range.start.slice(5, 7))]
+  const [ey, em] = [Number(range.end.slice(0, 4)), Number(range.end.slice(5, 7))]
+  if (![sy, sm, ey, em].every((n) => Number.isFinite(n) && n > 0)) return keys
+  let y = sy
+  let m = sm
+  while (y < ey || (y === ey && m <= em)) {
+    keys.push(`${y}-${String(m).padStart(2, '0')}`)
+    m += 1
+    if (m > 12) {
+      m = 1
+      y += 1
+    }
+    if (keys.length > 600) break // 防御：异常区间不至于无限循环
+  }
+  return keys
+}
+
+/** 区间内提交最多的月份（跨年时给「2025-11」而不是「11 月」） */
+export function peakMonthInRange(
+  events: AccountEvent[],
+  range: DateRange,
+): { month: string; commits: number } | null {
+  const byMonth = new Map<string, number>()
+  for (const e of events) {
+    if (e.commitCount <= 0) continue
+    const m = e.date.slice(0, 7)
+    if (m < range.start.slice(0, 7) || m > range.end.slice(0, 7)) continue
+    byMonth.set(m, (byMonth.get(m) ?? 0) + e.commitCount)
+  }
+  let best: { month: string; commits: number } | null = null
+  for (const [month, commits] of byMonth) {
+    if (!best || commits > best.commits) best = { month, commits }
+  }
+  return best
+}
+
+/** Top 活跃仓库的月度提交堆叠（当年 1-12 月） */
+export function repoMonthlyStack(
+  events: AccountEvent[],
+  year: number,
+  topN = 5,
+): RepoMonthlyStack {
+  const months = Array.from(
+    { length: 12 },
+    (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`,
+  )
+  return repoMonthlyStackForMonths(events, months, topN)
 }
 
 /** 深度抓取提交的小时直方图（0-23，作者时间，本地时区，可选仅本人） */

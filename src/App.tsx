@@ -13,7 +13,7 @@ const TABS: { id: TabId; label: string; hint: string }[] = [
   { id: 'overview', label: '总览', hint: '账号与全局指标' },
   { id: 'repos', label: '仓库画像', hint: '语言、Star、成熟度' },
   { id: 'activity', label: '活跃度', hint: '提交节奏与时段' },
-  { id: 'report', label: '年度报告', hint: '自然年切片' },
+  { id: 'report', label: '区间报告', hint: '任意时间段切片' },
 ]
 
 export default function App() {
