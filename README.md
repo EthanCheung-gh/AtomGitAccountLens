@@ -48,6 +48,10 @@ GitCode（gitcode.com）与 AtomGit（atomgit.com）已完成平台融合，账�
 
 React 18 + TypeScript + Vite + ECharts，pnpm 管理依赖。
 
+## 界面与配色
+
+暗色单一主题，取 GitCode 品牌红橙（`#ff5c33`）作强调色、近黑（`#0a0b0d`）作底。全站色值集中在两处：`src/theme.ts`（`palette` / `chart` / `echartsTheme`，供图表与组件使用）与 `src/index.css` 的 `:root`（CSS 变量，与 `palette` 逐项对应）；ECharts 通过 `registerTheme` 统一坐标轴、tooltip 与默认色板，组件内不写裸色值。布局为左侧固定导航（≤900px 折叠为顶部横条）+ 自适应栅格：统计卡 `auto-fit minmax(180px)`、图表卡 `auto-fit minmax(420px)`。
+
 ## 本地开发
 
 ```bash

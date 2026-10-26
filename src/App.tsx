@@ -9,80 +9,98 @@ import ReportTab from './tabs/ReportTab'
 
 export type TabId = 'overview' | 'repos' | 'activity' | 'report'
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'overview', label: '总览' },
-  { id: 'repos', label: '仓库画像' },
-  { id: 'activity', label: '活跃度' },
-  { id: 'report', label: '年度报告' },
+const TABS: { id: TabId; label: string; hint: string }[] = [
+  { id: 'overview', label: '总览', hint: '账号与全局指标' },
+  { id: 'repos', label: '仓库画像', hint: '语言、Star、成熟度' },
+  { id: 'activity', label: '活跃度', hint: '提交节奏与时段' },
+  { id: 'report', label: '年度报告', hint: '自然年切片' },
 ]
 
 export default function App() {
-  const { user, booting, signIn, signOut } = useAppStore()
+  const { user, booting, signIn, signOut, snapshot } = useAppStore()
   const [tab, setTab] = useState<TabId>('overview')
 
-  return (
-    <div className="app">
-      <header className="app-header">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden="true" />
-          <div className="brand-text">
-            <h1>AtomGitAccountLens</h1>
-            <p className="brand-sub">GitCode / AtomGit 账号全景透镜</p>
-          </div>
-        </div>
-        <div className="header-slot">
-          {user && (
-            <div className="user-chip">
-              {user.avatar_url ? (
-                <img className="user-avatar" src={user.avatar_url} alt="" />
-              ) : (
-                <span className="user-avatar user-avatar-fallback" aria-hidden="true">
-                  {user.login.slice(0, 1).toUpperCase()}
-                </span>
-              )}
-              <div className="user-meta">
-                <span className="user-login">{user.name || user.login}</span>
-                <button type="button" className="link-btn" onClick={signOut}>
-                  退出
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </header>
+  const signedIn = Boolean(user) && !booting
+  const current = TABS.find((t) => t.id === tab) ?? TABS[0]
+  const capturedAt = snapshot?.createdAt
+    ? new Date(snapshot.createdAt).toLocaleString('zh-CN', { hour12: false })
+    : null
 
-      {booting ? (
-        <section className="placeholder">正在用本设备记住的令牌登录…</section>
-      ) : !user ? (
-        <TokenGate onSignIn={signIn} />
-      ) : (
-        <>
-          <CrawlBanner />
-          <nav className="tab-bar" aria-label="分析分区">
+  return (
+    <div className={signedIn ? 'shell' : 'shell shell-plain'}>
+      {signedIn && (
+        <aside className="side-nav">
+          <div className="brand">
+            <span className="brand-mark" aria-hidden="true" />
+            <div className="brand-text">
+              <h1>AtomGitAccountLens</h1>
+              <p className="brand-sub">GitCode 账号全景透镜</p>
+            </div>
+          </div>
+
+          <nav className="side-links" aria-label="分析分区">
             {TABS.map((t) => (
               <button
                 key={t.id}
                 type="button"
                 className={`tab-item ${tab === t.id ? 'active' : ''}`}
                 onClick={() => setTab(t.id)}
+                aria-current={tab === t.id ? 'page' : undefined}
               >
-                {t.label}
+                <span className="tab-label">{t.label}</span>
+                <span className="tab-hint">{t.hint}</span>
               </button>
             ))}
           </nav>
 
-          <main className="tab-content">
-            {tab === 'overview' && <OverviewTab />}
-            {tab === 'repos' && <ReposTab />}
-            {tab === 'activity' && <ActivityTab />}
-            {tab === 'report' && <ReportTab />}
-          </main>
-        </>
+          <div className="side-foot">
+            <div className="user-chip">
+              {user!.avatar_url ? (
+                <img className="user-avatar" src={user!.avatar_url} alt="" />
+              ) : (
+                <span className="user-avatar user-avatar-fallback" aria-hidden="true">
+                  {user!.login.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <div className="user-meta">
+                <span className="user-login">{user!.name || user!.login}</span>
+                <button type="button" className="link-btn" onClick={signOut}>
+                  退出
+                </button>
+              </div>
+            </div>
+          </div>
+        </aside>
       )}
 
-      <footer className="app-footer">
-        数据仅存于你的浏览器 · 令牌不经过任何第三方服务器 · API: api.gitcode.com/api/v5
-      </footer>
+      <div className="main-col">
+        {booting ? (
+          <section className="placeholder">正在用本设备记住的令牌登录…</section>
+        ) : !user ? (
+          <TokenGate onSignIn={signIn} />
+        ) : (
+          <>
+            <CrawlBanner />
+            <header className="page-head">
+              <div>
+                <h1>{current.label}</h1>
+                <p className="page-sub">{current.hint}</p>
+              </div>
+              {capturedAt && <span className="page-meta">数据抓取于 {capturedAt}</span>}
+            </header>
+            <main className="tab-content">
+              {tab === 'overview' && <OverviewTab />}
+              {tab === 'repos' && <ReposTab />}
+              {tab === 'activity' && <ActivityTab />}
+              {tab === 'report' && <ReportTab />}
+            </main>
+            <footer className="app-footer">
+              数据仅存于你的浏览器 · 令牌不经过任何第三方服务器 · API:
+              api.gitcode.com/api/v5
+            </footer>
+          </>
+        )}
+      </div>
     </div>
   )
 }

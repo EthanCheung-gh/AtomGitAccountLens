@@ -17,14 +17,8 @@ import {
   topStargazed,
 } from '../lib/aggregate'
 import { currentYear, formatCount, formatDate } from '../lib/format'
+import { chart, palette } from '../theme'
 
-const AXIS_COLOR = '#8b949e'
-const SPLIT_LINE = '#21262d'
-const TOOLTIP_STYLE = {
-  backgroundColor: '#161b22',
-  borderColor: '#30363d',
-  textStyle: { color: '#e6edf3' },
-}
 
 function truncate(name: string, max = 26): string {
   return name.length > max ? `${name.slice(0, max - 1)}…` : name
@@ -82,18 +76,18 @@ export default function ReposTab() {
   const langOption = useMemo<EChartsOption>(() => {
     const top = activeLangs.slice(0, 10)
     return {
-      tooltip: TOOLTIP_STYLE,
+      tooltip: chart.tooltip,
       grid: { left: 8, right: 48, top: 8, bottom: 8, containLabel: true },
       xAxis: {
         type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11, formatter: '{value}%' },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11, formatter: '{value}%' },
+        splitLine: { lineStyle: { color: chart.split } },
       },
       yAxis: {
         type: 'category',
         data: top.map((l) => `${l.language}（${l.repoCount} 仓）`).reverse(),
-        axisLabel: { color: '#e6edf3', fontSize: 12 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.label, fontSize: 12 },
+        axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
       },
       series: [
@@ -101,10 +95,10 @@ export default function ReposTab() {
           type: 'bar',
           data: top.map((l) => Number(l.percent.toFixed(1))).reverse(),
           itemStyle: {
-            color: calibre === 'repo' ? '#58a6ff' : '#d2a8ff',
+            color: calibre === 'repo' ? palette.accent : palette.blue,
             borderRadius: [0, 3, 3, 0],
           },
-          label: { show: true, position: 'right', color: AXIS_COLOR, fontSize: 11 },
+          label: { show: true, position: 'right', color: chart.axis, fontSize: 11 },
         },
       ],
     }
@@ -116,18 +110,18 @@ export default function ReposTab() {
   )
   const creationOption = useMemo<EChartsOption>(
     () => ({
-      tooltip: { ...TOOLTIP_STYLE, trigger: 'axis' },
+      tooltip: { ...chart.tooltip, trigger: 'axis' },
       grid: { left: 44, right: 16, top: 18, bottom: 30 },
       xAxis: {
         type: 'time',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11, formatter: '{yyyy}-{MM}' },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11, formatter: '{yyyy}-{MM}' },
+        axisLine: { lineStyle: { color: chart.split } },
       },
       yAxis: {
         type: 'value',
         minInterval: 1,
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        splitLine: { lineStyle: { color: chart.split } },
       },
       series: [
         {
@@ -137,8 +131,8 @@ export default function ReposTab() {
           symbolSize: 5,
           data: creationTimeline.map((m) => [`${m.month}-01`, m.count]),
           areaStyle: { opacity: 0.25 },
-          lineStyle: { color: '#39d353', width: 2 },
-          itemStyle: { color: '#39d353' },
+          lineStyle: { color: palette.accent, width: 2 },
+          itemStyle: { color: palette.accent },
         },
       ],
     }),
@@ -154,27 +148,27 @@ export default function ReposTab() {
       ? [freshness.within30, freshness.within180, freshness.within365, freshness.dormant]
       : [0, 0, 0, 0]
     return {
-      tooltip: { ...TOOLTIP_STYLE, trigger: 'axis' },
+      tooltip: { ...chart.tooltip, trigger: 'axis' },
       grid: { left: 40, right: 12, top: 18, bottom: 30 },
       xAxis: {
         type: 'category',
         data: ['30 天内', '半年内', '一年内', '休眠 >1 年'],
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
       },
       yAxis: {
         type: 'value',
         minInterval: 1,
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        splitLine: { lineStyle: { color: chart.split } },
       },
       series: [
         {
           type: 'bar',
           data,
-          itemStyle: { color: '#58a6ff', borderRadius: [3, 3, 0, 0] },
-          label: { show: true, position: 'top', color: AXIS_COLOR, fontSize: 11 },
+          itemStyle: { color: palette.accent, borderRadius: [3, 3, 0, 0] },
+          label: { show: true, position: 'top', color: chart.axis, fontSize: 11 },
         },
       ],
     }
@@ -187,26 +181,26 @@ export default function ReposTab() {
   const topStarsOption = useMemo<EChartsOption>(() => {
     const items = topStars.slice(0, 10)
     return {
-      tooltip: TOOLTIP_STYLE,
+      tooltip: chart.tooltip,
       grid: { left: 8, right: 44, top: 8, bottom: 8, containLabel: true },
       xAxis: {
         type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        splitLine: { lineStyle: { color: chart.split } },
       },
       yAxis: {
         type: 'category',
         data: items.map((t) => truncate(t.path)).reverse(),
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
       },
       series: [
         {
           type: 'bar',
           data: items.map((t) => t.stars).reverse(),
-          itemStyle: { color: '#e3b341', borderRadius: [0, 3, 3, 0] },
-          label: { show: true, position: 'right', color: AXIS_COLOR, fontSize: 11 },
+          itemStyle: { color: palette.warn, borderRadius: [0, 3, 3, 0] },
+          label: { show: true, position: 'right', color: chart.axis, fontSize: 11 },
         },
       ],
     }
@@ -220,10 +214,10 @@ export default function ReposTab() {
   const nsOption = useMemo<EChartsOption>(() => {
     const items = nsStats.slice(0, 8)
     return {
-      tooltip: { ...TOOLTIP_STYLE, trigger: 'axis' },
+      tooltip: { ...chart.tooltip, trigger: 'axis' },
       legend: {
         top: 0,
-        textStyle: { color: AXIS_COLOR, fontSize: 11 },
+        textStyle: { color: chart.axis, fontSize: 11 },
         icon: 'roundRect',
         itemWidth: 12,
         itemHeight: 8,
@@ -232,25 +226,25 @@ export default function ReposTab() {
       xAxis: {
         type: 'category',
         data: items.map((n) => truncate(n.ns, 12)),
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
       },
       yAxis: [
         {
           type: 'value',
           name: '仓库',
-          nameTextStyle: { color: AXIS_COLOR },
+          nameTextStyle: { color: chart.axis },
           minInterval: 1,
-          axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-          splitLine: { lineStyle: { color: SPLIT_LINE } },
+          axisLabel: { color: chart.axis, fontSize: 11 },
+          splitLine: { lineStyle: { color: chart.split } },
         },
         {
           type: 'value',
           name: '提交',
-          nameTextStyle: { color: AXIS_COLOR },
+          nameTextStyle: { color: chart.axis },
           minInterval: 1,
-          axisLabel: { color: AXIS_COLOR, fontSize: 11 },
+          axisLabel: { color: chart.axis, fontSize: 11 },
           splitLine: { show: false },
         },
       ],
@@ -259,14 +253,14 @@ export default function ReposTab() {
           name: '仓库数',
           type: 'bar',
           data: items.map((n) => n.repos),
-          itemStyle: { color: '#58a6ff', borderRadius: [3, 3, 0, 0] },
+          itemStyle: { color: palette.accent, borderRadius: [3, 3, 0, 0] },
         },
         {
           name: `${currentYear()} 年提交`,
           type: 'bar',
           yAxisIndex: 1,
           data: items.map((n) => n.commits),
-          itemStyle: { color: '#39d353', borderRadius: [3, 3, 0, 0] },
+          itemStyle: { color: palette.accent2, borderRadius: [3, 3, 0, 0] },
         },
       ],
     }

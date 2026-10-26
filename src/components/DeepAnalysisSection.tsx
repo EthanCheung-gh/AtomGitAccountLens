@@ -14,14 +14,8 @@ import {
   repoCommitTotals,
 } from '../lib/aggregate'
 import { formatCount, formatDate, formatDateTime } from '../lib/format'
+import { chart, palette } from '../theme'
 
-const AXIS_COLOR = '#8b949e'
-const SPLIT_LINE = '#21262d'
-const TOOLTIP_STYLE = {
-  backgroundColor: '#161b22',
-  borderColor: '#30363d',
-  textStyle: { color: '#e6edf3' },
-}
 const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
 function truncate(name: string, max = 26): string {
@@ -34,7 +28,7 @@ function heatmapOption(matrix: number[][], unit: string): EChartsOption {
   matrix.forEach((row, y) => row.forEach((v, x) => data.push([x, y, v])))
   return {
     tooltip: {
-      ...TOOLTIP_STYLE,
+      ...chart.tooltip,
       formatter: (p: unknown) => {
         const d = (p as { value: [number, number, number] }).value
         return `${WEEKDAYS[d[1]]} ${d[0]}时：${d[2]} ${unit}`
@@ -44,17 +38,17 @@ function heatmapOption(matrix: number[][], unit: string): EChartsOption {
     xAxis: {
       type: 'category',
       data: Array.from({ length: 24 }, (_, h) => `${h}`),
-      axisLabel: { color: AXIS_COLOR, interval: 1, fontSize: 10 },
-      axisLine: { lineStyle: { color: SPLIT_LINE } },
+      axisLabel: { color: chart.axis, interval: 1, fontSize: 10 },
+      axisLine: { lineStyle: { color: chart.split } },
       axisTick: { show: false },
       name: '时',
-      nameTextStyle: { color: AXIS_COLOR },
+      nameTextStyle: { color: chart.axis },
     },
     yAxis: {
       type: 'category',
       data: WEEKDAYS,
-      axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-      axisLine: { lineStyle: { color: SPLIT_LINE } },
+      axisLabel: { color: chart.axis, fontSize: 11 },
+      axisLine: { lineStyle: { color: chart.split } },
       axisTick: { show: false },
     },
     visualMap: {
@@ -66,8 +60,8 @@ function heatmapOption(matrix: number[][], unit: string): EChartsOption {
       bottom: 0,
       itemWidth: 12,
       itemHeight: 90,
-      inRange: { color: ['#161b22', '#1f3a5f', '#1f6feb', '#58a6ff', '#cfe3ff'] },
-      textStyle: { color: AXIS_COLOR },
+      inRange: { color: chart.scale },
+      textStyle: { color: chart.axis },
     },
     series: [{ type: 'heatmap', data, label: { show: false } }],
   }
@@ -92,25 +86,25 @@ export default function DeepAnalysisSection() {
 
   const hourOption = useMemo<EChartsOption>(
     () => ({
-      tooltip: { ...TOOLTIP_STYLE, trigger: 'axis' },
+      tooltip: { ...chart.tooltip, trigger: 'axis' },
       grid: { left: 44, right: 12, top: 18, bottom: 26 },
       xAxis: {
         type: 'category',
         data: Array.from({ length: 24 }, (_, h) => `${h}时`),
-        axisLabel: { color: AXIS_COLOR, interval: 2, fontSize: 11 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, interval: 2, fontSize: 11 },
+        axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
       },
       yAxis: {
         type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        splitLine: { lineStyle: { color: chart.split } },
       },
       series: [
         {
           type: 'bar',
           data: hourHist,
-          itemStyle: { color: '#39c5cf', borderRadius: [3, 3, 0, 0] },
+          itemStyle: { color: palette.accent3, borderRadius: [3, 3, 0, 0] },
         },
       ],
     }),
@@ -119,26 +113,26 @@ export default function DeepAnalysisSection() {
 
   const yearlyOption = useMemo<EChartsOption>(
     () => ({
-      tooltip: { ...TOOLTIP_STYLE, trigger: 'axis' },
+      tooltip: { ...chart.tooltip, trigger: 'axis' },
       grid: { left: 44, right: 12, top: 18, bottom: 26 },
       xAxis: {
         type: 'category',
         data: yearly.map((y) => `${y.year}`),
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
       },
       yAxis: {
         type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        splitLine: { lineStyle: { color: chart.split } },
       },
       series: [
         {
           type: 'bar',
           data: yearly.map((y) => y.count),
-          itemStyle: { color: '#39d353', borderRadius: [3, 3, 0, 0] },
-          label: { show: true, position: 'top', color: AXIS_COLOR, fontSize: 10 },
+          itemStyle: { color: palette.accent, borderRadius: [3, 3, 0, 0] },
+          label: { show: true, position: 'top', color: chart.axis, fontSize: 10 },
         },
       ],
     }),
@@ -147,25 +141,25 @@ export default function DeepAnalysisSection() {
 
   const weekdayOption = useMemo<EChartsOption>(
     () => ({
-      tooltip: { ...TOOLTIP_STYLE, trigger: 'axis' },
+      tooltip: { ...chart.tooltip, trigger: 'axis' },
       grid: { left: 44, right: 12, top: 18, bottom: 26 },
       xAxis: {
         type: 'category',
         data: WEEKDAYS,
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
       },
       yAxis: {
         type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        splitLine: { lineStyle: { color: chart.split } },
       },
       series: [
         {
           type: 'bar',
           data: weekday,
-          itemStyle: { color: '#58a6ff', borderRadius: [3, 3, 0, 0] },
+          itemStyle: { color: palette.accent2, borderRadius: [3, 3, 0, 0] },
         },
       ],
     }),
@@ -176,17 +170,17 @@ export default function DeepAnalysisSection() {
 
   const monthlyOption = useMemo<EChartsOption>(
     () => ({
-      tooltip: { ...TOOLTIP_STYLE, trigger: 'axis' },
+      tooltip: { ...chart.tooltip, trigger: 'axis' },
       grid: { left: 48, right: 16, top: 18, bottom: 30 },
       xAxis: {
         type: 'time',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11, formatter: '{yyyy}-{MM}' },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11, formatter: '{yyyy}-{MM}' },
+        axisLine: { lineStyle: { color: chart.split } },
       },
       yAxis: {
         type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        splitLine: { lineStyle: { color: chart.split } },
       },
       series: [
         {
@@ -195,8 +189,8 @@ export default function DeepAnalysisSection() {
           symbol: 'none',
           data: monthly.map((m) => [`${m.month}-01`, m.count]),
           areaStyle: { opacity: 0.25 },
-          lineStyle: { color: '#d2a8ff', width: 2 },
-          itemStyle: { color: '#d2a8ff' },
+          lineStyle: { color: palette.accent, width: 2 },
+          itemStyle: { color: palette.accent },
         },
       ],
     }),
@@ -206,26 +200,26 @@ export default function DeepAnalysisSection() {
   const typeOption = useMemo<EChartsOption>(() => {
     const items = types.slice(0, 8)
     return {
-      tooltip: TOOLTIP_STYLE,
+      tooltip: chart.tooltip,
       grid: { left: 8, right: 40, top: 8, bottom: 8, containLabel: true },
       xAxis: {
         type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        splitLine: { lineStyle: { color: chart.split } },
       },
       yAxis: {
         type: 'category',
         data: items.map((t) => t.label).reverse(),
-        axisLabel: { color: '#e6edf3', fontSize: 12 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.label, fontSize: 12 },
+        axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
       },
       series: [
         {
           type: 'bar',
           data: items.map((t) => t.count).reverse(),
-          itemStyle: { color: '#f0883e', borderRadius: [0, 3, 3, 0] },
-          label: { show: true, position: 'right', color: AXIS_COLOR, fontSize: 11 },
+          itemStyle: { color: palette.accent2, borderRadius: [0, 3, 3, 0] },
+          label: { show: true, position: 'right', color: chart.axis, fontSize: 11 },
         },
       ],
     }
@@ -234,26 +228,26 @@ export default function DeepAnalysisSection() {
   const repoTotalsOption = useMemo<EChartsOption>(() => {
     const items = repoTotals.slice(0, 10)
     return {
-      tooltip: TOOLTIP_STYLE,
+      tooltip: chart.tooltip,
       grid: { left: 8, right: 44, top: 8, bottom: 8, containLabel: true },
       xAxis: {
         type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        splitLine: { lineStyle: { color: chart.split } },
       },
       yAxis: {
         type: 'category',
         data: items.map((t) => truncate(t.repo)).reverse(),
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
       },
       series: [
         {
           type: 'bar',
           data: items.map((t) => t.count).reverse(),
-          itemStyle: { color: '#d29922', borderRadius: [0, 3, 3, 0] },
-          label: { show: true, position: 'right', color: AXIS_COLOR, fontSize: 11 },
+          itemStyle: { color: palette.accent, borderRadius: [0, 3, 3, 0] },
+          label: { show: true, position: 'right', color: chart.axis, fontSize: 11 },
         },
       ],
     }

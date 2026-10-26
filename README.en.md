@@ -48,6 +48,10 @@ GitCode (gitcode.com) and AtomGit (atomgit.com) have merged platforms with a sha
 
 React 18 + TypeScript + Vite + ECharts, managed with pnpm.
 
+## Look and palette
+
+Single dark theme: GitCode brand orange (`#ff5c33`) as the accent over a near-black canvas (`#0a0b0d`). Every color lives in exactly two places — `src/theme.ts` (`palette` / `chart` / `echartsTheme` for charts and components) and the `:root` block of `src/index.css` (CSS variables mirroring `palette`, one-to-one). ECharts registers a theme so axes, tooltips and the default series palette stay consistent, and components contain no raw hex values. Layout is a fixed left sidebar (collapses to a top bar at ≤900px) plus responsive grids: stat cards `auto-fit minmax(180px)`, chart cards `auto-fit minmax(420px)`.
+
 ## Development
 
 ```bash

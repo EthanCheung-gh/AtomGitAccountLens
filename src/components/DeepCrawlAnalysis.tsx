@@ -4,9 +4,7 @@ import EChart from './EChart'
 import { useAppStore } from '../state/AppStore'
 import { commitHourHistogram, deepCommitMeta } from '../lib/aggregate'
 import { formatCount, formatDate } from '../lib/format'
-
-const AXIS_COLOR = '#8b949e'
-const SPLIT_LINE = '#21262d'
+import { chart, palette } from '../theme'
 
 /** 提交级分析结果：样本 > 0 时渲染小时直方图与元信息，否则不渲染 */
 export default function DeepCrawlAnalysis() {
@@ -20,29 +18,27 @@ export default function DeepCrawlAnalysis() {
   const option = useMemo<EChartsOption>(
     () => ({
       tooltip: {
-        backgroundColor: '#161b22',
-        borderColor: '#30363d',
-        textStyle: { color: '#e6edf3' },
+        ...chart.tooltip,
         trigger: 'axis',
       },
       grid: { left: 40, right: 12, top: 18, bottom: 26 },
       xAxis: {
         type: 'category',
         data: Array.from({ length: 24 }, (_, h) => `${h}时`),
-        axisLabel: { color: AXIS_COLOR, interval: 2, fontSize: 11 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, interval: 2, fontSize: 11 },
+        axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
       },
       yAxis: {
         type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        splitLine: { lineStyle: { color: chart.split } },
       },
       series: [
         {
           type: 'bar',
           data: hist,
-          itemStyle: { color: '#39c5cf', borderRadius: [3, 3, 0, 0] },
+          itemStyle: { color: palette.accent, borderRadius: [3, 3, 0, 0] },
         },
       ],
     }),

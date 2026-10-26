@@ -15,14 +15,8 @@ import {
   summarizeEvents,
 } from '../lib/aggregate'
 import { currentYear, formatCount, formatDate } from '../lib/format'
+import { chart, palette } from '../theme'
 
-const AXIS_COLOR = '#8b949e'
-const SPLIT_LINE = '#21262d'
-const TOOLTIP_STYLE = {
-  backgroundColor: '#161b22',
-  borderColor: '#30363d',
-  textStyle: { color: '#e6edf3' },
-}
 
 function truncate(name: string, max = 22): string {
   return name.length > max ? `${name.slice(0, max - 1)}…` : name
@@ -69,18 +63,18 @@ export default function ReportTab() {
   const langOption = useMemo<EChartsOption>(() => {
     const top = languages.slice(0, 8)
     return {
-      tooltip: { ...TOOLTIP_STYLE },
+      tooltip: { ...chart.tooltip },
       grid: { left: 8, right: 48, top: 8, bottom: 8, containLabel: true },
       xAxis: {
         type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11, formatter: '{value}%' },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11, formatter: '{value}%' },
+        splitLine: { lineStyle: { color: chart.split } },
       },
       yAxis: {
         type: 'category',
         data: top.map((l) => `${l.language}（${l.repoCount} 仓）`).reverse(),
-        axisLabel: { color: '#e6edf3', fontSize: 12 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.label, fontSize: 12 },
+        axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
       },
       series: [
@@ -88,10 +82,10 @@ export default function ReportTab() {
           type: 'bar',
           data: top.map((l) => Number(l.percent.toFixed(1))).reverse(),
           itemStyle: {
-            color: '#58a6ff',
+            color: palette.accent,
             borderRadius: [0, 3, 3, 0],
           },
-          label: { show: true, position: 'right', color: AXIS_COLOR, fontSize: 11 },
+          label: { show: true, position: 'right', color: chart.axis, fontSize: 11 },
         },
       ],
     }

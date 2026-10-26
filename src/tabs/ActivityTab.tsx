@@ -16,14 +16,8 @@ import {
   weekdayHourMatrix,
 } from '../lib/aggregate'
 import { currentYear, formatCount } from '../lib/format'
+import { chart, palette } from '../theme'
 
-const AXIS_COLOR = '#8b949e'
-const SPLIT_LINE = '#21262d'
-const TOOLTIP_STYLE = {
-  backgroundColor: '#161b22',
-  borderColor: '#30363d',
-  textStyle: { color: '#e6edf3' },
-}
 
 function truncate(name: string, max = 26): string {
   return name.length > max ? `${name.slice(0, max - 1)}…` : name
@@ -63,7 +57,7 @@ export default function ActivityTab() {
     const maxDaily = data.reduce((m, d) => Math.max(m, d[1] as number), 0)
     return {
       tooltip: {
-        ...TOOLTIP_STYLE,
+        ...chart.tooltip,
         formatter: (p: unknown) => {
           const v = (p as { value: [string, number] }).value
           return `${v[0]}：${v[1]} 次提交`
@@ -78,9 +72,9 @@ export default function ActivityTab() {
         top: 0,
         itemHeight: 120,
         inRange: {
-          color: ['#161b22', '#0e4429', '#006d32', '#26a641', '#39d353'],
+          color: chart.scale,
         },
-        textStyle: { color: AXIS_COLOR },
+        textStyle: { color: chart.axis },
       },
       calendar: {
         range: [`${year}-01-01`, `${year}-12-31`],
@@ -90,14 +84,14 @@ export default function ActivityTab() {
         top: 44,
         bottom: 4,
         itemStyle: {
-          color: '#0d1117',
-          borderColor: '#161b22',
+          color: palette.bg,
+          borderColor: palette.panel2,
           borderWidth: 2,
         },
         splitLine: { show: false },
         yearLabel: { show: false },
-        monthLabel: { nameMap: 'cn', color: AXIS_COLOR, fontSize: 11 },
-        dayLabel: { nameMap: 'cn', color: AXIS_COLOR, fontSize: 10 },
+        monthLabel: { nameMap: 'cn', color: chart.axis, fontSize: 11 },
+        dayLabel: { nameMap: 'cn', color: chart.axis, fontSize: 10 },
       },
       series: [
         {
@@ -114,26 +108,26 @@ export default function ActivityTab() {
     const names = top.map((r) => truncate(r.repo)).reverse()
     const values = top.map((r) => r.commits).reverse()
     return {
-      tooltip: { ...TOOLTIP_STYLE },
+      tooltip: { ...chart.tooltip },
       grid: { left: 8, right: 40, top: 8, bottom: 8, containLabel: true },
       xAxis: {
         type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        splitLine: { lineStyle: { color: chart.split } },
       },
       yAxis: {
         type: 'category',
         data: names,
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
       },
       series: [
         {
           type: 'bar',
           data: values,
-          itemStyle: { color: '#d29922', borderRadius: [0, 3, 3, 0] },
-          label: { show: true, position: 'right', color: AXIS_COLOR, fontSize: 11 },
+          itemStyle: { color: palette.accent, borderRadius: [0, 3, 3, 0] },
+          label: { show: true, position: 'right', color: chart.axis, fontSize: 11 },
         },
       ],
     }
@@ -143,26 +137,26 @@ export default function ActivityTab() {
   const actions = useMemo(() => actionBreakdown(events ?? []).slice(0, 10), [events])
   const actionOption = useMemo<EChartsOption>(
     () => ({
-      tooltip: { ...TOOLTIP_STYLE },
+      tooltip: { ...chart.tooltip },
       grid: { left: 8, right: 40, top: 8, bottom: 8, containLabel: true },
       xAxis: {
         type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        splitLine: { lineStyle: { color: chart.split } },
       },
       yAxis: {
         type: 'category',
         data: actions.map((a) => a.label).reverse(),
-        axisLabel: { color: '#e6edf3', fontSize: 12 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.label, fontSize: 12 },
+        axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
       },
       series: [
         {
           type: 'bar',
           data: actions.map((a) => a.count).reverse(),
-          itemStyle: { color: '#a371f7', borderRadius: [0, 3, 3, 0] },
-          label: { show: true, position: 'right', color: AXIS_COLOR, fontSize: 11 },
+          itemStyle: { color: palette.accent2, borderRadius: [0, 3, 3, 0] },
+          label: { show: true, position: 'right', color: chart.axis, fontSize: 11 },
         },
       ],
     }),
@@ -176,7 +170,7 @@ export default function ActivityTab() {
     weekdayHour.forEach((row, y) => row.forEach((v, x) => data.push([x, y, v])))
     return {
       tooltip: {
-        ...TOOLTIP_STYLE,
+        ...chart.tooltip,
         formatter: (p: unknown) => {
           const d = (p as { value: [number, number, number] }).value
           const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
@@ -187,17 +181,17 @@ export default function ActivityTab() {
       xAxis: {
         type: 'category',
         data: Array.from({ length: 24 }, (_, h) => `${h}`),
-        axisLabel: { color: AXIS_COLOR, interval: 1, fontSize: 10 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, interval: 1, fontSize: 10 },
+        axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
         name: '时',
-        nameTextStyle: { color: AXIS_COLOR },
+        nameTextStyle: { color: chart.axis },
       },
       yAxis: {
         type: 'category',
         data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
       },
       visualMap: {
@@ -209,8 +203,8 @@ export default function ActivityTab() {
         bottom: 0,
         itemWidth: 12,
         itemHeight: 90,
-        inRange: { color: ['#161b22', '#1f3a5f', '#1f6feb', '#58a6ff', '#cfe3ff'] },
-        textStyle: { color: AXIS_COLOR },
+        inRange: { color: chart.scale },
+        textStyle: { color: chart.axis },
       },
       series: [{ type: 'heatmap', data, label: { show: false } }],
     }
@@ -219,19 +213,19 @@ export default function ActivityTab() {
   const cumulative = useMemo(() => cumulativeCommits(events ?? []), [events])
   const cumulativeOption = useMemo<EChartsOption>(
     () => ({
-      tooltip: { ...TOOLTIP_STYLE, trigger: 'axis' },
+      tooltip: { ...chart.tooltip, trigger: 'axis' },
       grid: { left: 48, right: 16, top: 18, bottom: 28 },
       xAxis: {
         type: 'time',
         min: `${year}-01-01`,
         max: `${year}-12-31`,
-        axisLabel: { color: AXIS_COLOR, fontSize: 11, formatter: '{MMM}' },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11, formatter: '{MMM}' },
+        axisLine: { lineStyle: { color: chart.split } },
       },
       yAxis: {
         type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        splitLine: { lineStyle: { color: chart.split } },
       },
       series: [
         {
@@ -240,8 +234,8 @@ export default function ActivityTab() {
           symbol: 'none',
           data: cumulative.map((p) => [p.date, p.cumulative]),
           areaStyle: { opacity: 0.25 },
-          lineStyle: { color: '#39d353', width: 2 },
-          itemStyle: { color: '#39d353' },
+          lineStyle: { color: palette.accent, width: 2 },
+          itemStyle: { color: palette.accent },
         },
       ],
     }),
@@ -251,25 +245,25 @@ export default function ActivityTab() {
   const pushSizes = useMemo(() => pushSizeStats(events ?? []), [events])
   const pushOption = useMemo<EChartsOption>(
     () => ({
-      tooltip: { ...TOOLTIP_STYLE, trigger: 'axis' },
+      tooltip: { ...chart.tooltip, trigger: 'axis' },
       grid: { left: 40, right: 12, top: 18, bottom: 30 },
       xAxis: {
         type: 'category',
         data: pushSizes.buckets.map((b) => `${b.label} 个`),
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
       },
       yAxis: {
         type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        splitLine: { lineStyle: { color: chart.split } },
       },
       series: [
         {
           type: 'bar',
           data: pushSizes.buckets.map((b) => b.count),
-          itemStyle: { color: '#f0883e', borderRadius: [3, 3, 0, 0] },
+          itemStyle: { color: palette.accent2, borderRadius: [3, 3, 0, 0] },
         },
       ],
     }),
@@ -279,11 +273,11 @@ export default function ActivityTab() {
   const monthlyStack = useMemo(() => repoMonthlyStack(events ?? [], year, 5), [events, year])
   const monthlyStackOption = useMemo<EChartsOption>(
     () => ({
-      tooltip: { ...TOOLTIP_STYLE, trigger: 'axis' },
+      tooltip: { ...chart.tooltip, trigger: 'axis' },
       legend: {
         top: 0,
         type: 'scroll',
-        textStyle: { color: AXIS_COLOR, fontSize: 11 },
+        textStyle: { color: chart.axis, fontSize: 11 },
         icon: 'roundRect',
         itemWidth: 12,
         itemHeight: 8,
@@ -292,16 +286,16 @@ export default function ActivityTab() {
       xAxis: {
         type: 'category',
         data: monthlyStack.months.map((m) => m.slice(5)),
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        axisLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        axisLine: { lineStyle: { color: chart.split } },
         axisTick: { show: false },
         name: '月',
-        nameTextStyle: { color: AXIS_COLOR },
+        nameTextStyle: { color: chart.axis },
       },
       yAxis: {
         type: 'value',
-        axisLabel: { color: AXIS_COLOR, fontSize: 11 },
-        splitLine: { lineStyle: { color: SPLIT_LINE } },
+        axisLabel: { color: chart.axis, fontSize: 11 },
+        splitLine: { lineStyle: { color: chart.split } },
       },
       series: monthlyStack.series.map((s) => ({
         name: truncate(s.repo, 18),
