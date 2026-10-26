@@ -168,3 +168,74 @@ describe('crawlAccount 年度事件：0 条单独标记', () => {
     expect(result.eventsUnavailable['2026']).toBeUndefined()
   })
 })
+
+describe('crawlAccount 事件仓库路径提取', () => {
+  const makeClient = (project: unknown) =>
+    ({
+      async getUser() {
+        return { login: 'me' }
+      },
+      async listUserRepos() {
+        return []
+      },
+      async getRepoLanguages() {
+        return {}
+      },
+      async listUserEvents() {
+        return {
+          '2026-03-02': [
+            { action_name: 'pushed', created_at: '2026-03-02T10:00:00+08:00', project },
+            { action_name: 'pushed', created_at: '2026-03-02T11:00:00+08:00', project },
+          ],
+        }
+      },
+    }) as unknown as GitCodeClient
+
+  const shapeCases: [string, unknown, string][] = [
+    ['project.path_with_namespace', { path_with_namespace: 'me/r1' }, 'me/r1'],
+    ['project.namespace+path', { namespace: { path: 'me' }, path: 'r1' }, 'me/r1'],
+    ['namespace 为字符串', { namespace: 'me', name: 'r1' }, 'me/r1'],
+    ['project 为字符串', 'me/r1', 'me/r1'],
+    ['full_name', { full_name: 'me/r1' }, 'me/r1'],
+    ['只有仓库名', { name: 'solo' }, 'solo'],
+  ]
+
+  for (const [label, project, expected] of shapeCases) {
+    it(`从 ${label} 提取仓库路径`, async () => {
+      const result = await crawlAccount(makeClient(project), { years: [2026] })
+      expect(result.eventsByYear['2026'][0].repoPath).toBe(expected)
+    })
+  }
+
+  it('事件缺仓库字段时为空字符串（不编造）', async () => {
+    const result = await crawlAccount(makeClient(null), { years: [2026] })
+    expect(result.eventsByYear['2026'][0].repoPath).toBe('')
+  })
+
+  it('repository 字段（而非 project）也能识别', async () => {
+    const client = {
+      async getUser() {
+        return { login: 'me' }
+      },
+      async listUserRepos() {
+        return []
+      },
+      async getRepoLanguages() {
+        return {}
+      },
+      async listUserEvents() {
+        return {
+          '2026-03-02': [
+            {
+              action_name: 'pushed',
+              created_at: '2026-03-02T10:00:00+08:00',
+              repository: { full_name: 'me/other' },
+            },
+          ],
+        }
+      },
+    } as unknown as GitCodeClient
+    const result = await crawlAccount(client, { years: [2026] })
+    expect(result.eventsByYear['2026'][0].repoPath).toBe('me/other')
+  })
+})

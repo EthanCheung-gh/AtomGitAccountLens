@@ -515,23 +515,28 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     }
   }, [user, startCrawl])
 
-  // 迁移：旧快照的 'empty' 标记由「解析不出」写死，换新解析口径后必须重抓一次
+  // 迁移：旧快照的 'empty' 标记与「缺仓库字段」的年度数据都不可信，需重抓一次
   useEffect(() => {
     const snap = snapshotRef.current
     if (!snap) return
     if ((snap.eventsCalibre ?? 1) >= EVENTS_CALIBRE) return
+
     const nextUnavailable = { ...(snap.eventsUnavailable ?? {}) }
-    let changed = false
     for (const [key, kind] of Object.entries(nextUnavailable)) {
-      if (kind === 'empty') {
-        delete nextUnavailable[key]
-        changed = true
-      }
+      if (kind === 'empty') delete nextUnavailable[key]
     }
+
+    // 仓库字段全空的年份：旧解析器只读 project 字段，这些数据按仓库维度不可用
+    const nextEvents = { ...snap.eventsByYear }
+    for (const [key, list] of Object.entries(nextEvents)) {
+      if (list.length > 0 && list.every((e) => !e.repoPath)) delete nextEvents[key]
+    }
+
     commitSnapshot({
       ...snap,
       eventsCalibre: EVENTS_CALIBRE,
-      eventsUnavailable: changed ? nextUnavailable : snap.eventsUnavailable,
+      eventsByYear: nextEvents,
+      eventsUnavailable: nextUnavailable,
     })
     attemptedYearsRef.current.clear()
   }, [snapshot, commitSnapshot])

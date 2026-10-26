@@ -36,24 +36,73 @@ export interface CrawlResult {
 const MAX_REPO_PAGES = 50 // 每页 100 → 上限 5000 仓库
 const MAX_EVENT_PAGES = 100
 
-function normalizeEvent(date: string, raw: RawGitCodeEvent): AccountEvent {
-  const project = raw.project ?? null
-  let path = project?.path_with_namespace ?? ''
-  if (!path && project) {
-    const ns =
-      typeof project.namespace === 'string'
-        ? project.namespace
-        : project.namespace?.path
-    if (ns && project.path) path = `${ns}/${project.path}`
-    else if (project.path) path = project.path
+/** 从各种可能形状里取出仓库路径（owner/repo） */
+function repoPathFromNode(node: unknown): string {
+  if (!node) return ''
+  if (typeof node === 'string') return node.includes('/') ? node : ''
+  if (typeof node !== 'object') return ''
+  const o = node as Record<string, unknown>
+  for (const key of ['path_with_namespace', 'full_name', 'full_path', 'name_with_namespace']) {
+    const v = o[key]
+    if (typeof v === 'string' && v.includes('/')) return v
   }
+  const nsRaw = o.namespace ?? o.owner
+  const ns =
+    typeof nsRaw === 'string'
+      ? nsRaw
+      : nsRaw && typeof nsRaw === 'object'
+        ? String(
+            (nsRaw as Record<string, unknown>).path ??
+              (nsRaw as Record<string, unknown>).name ??
+              (nsRaw as Record<string, unknown>).login ??
+              '',
+          )
+        : ''
+  const name =
+    typeof o.path === 'string'
+      ? o.path
+      : typeof o.name === 'string'
+        ? o.name
+        : typeof o.repo === 'string'
+          ? o.repo
+          : ''
+  if (ns && name) return `${ns}/${name}`
+  if (name.includes('/')) return name
+  return name
+}
+
+/**
+ * 事件里的仓库标识。GitCode 各版本的形状不一致（project / repository / repo /
+ * target_project，字符串或对象），只认 project 会让「按仓库分组」整片为空，
+ * 于是仓库维度的图表没有数据 —— 这里按候选字段逐个尝试。
+ */
+function eventRepoPath(raw: RawGitCodeEvent): string {
+  const candidates: unknown[] = [
+    raw.project,
+    raw.repository,
+    raw.repo,
+    raw.target_project,
+    raw.project_path,
+    raw.repository_path,
+    raw.repo_path,
+    raw.path_with_namespace,
+    raw.full_name,
+  ]
+  for (const candidate of candidates) {
+    const path = repoPathFromNode(candidate)
+    if (path) return path
+  }
+  return ''
+}
+
+function normalizeEvent(date: string, raw: RawGitCodeEvent): AccountEvent {
+  const pushData = raw.push_data as { commit_count?: unknown } | null | undefined
   return {
     date,
-    action: raw.action_name ?? 'unknown',
-    repoPath: path,
-    commitCount:
-      typeof raw.push_data?.commit_count === 'number' ? raw.push_data.commit_count : 0,
-    createdAt: raw.created_at ?? null,
+    action: typeof raw.action_name === 'string' ? raw.action_name : 'unknown',
+    repoPath: eventRepoPath(raw),
+    commitCount: typeof pushData?.commit_count === 'number' ? pushData.commit_count : 0,
+    createdAt: typeof raw.created_at === 'string' ? raw.created_at : null,
   }
 }
 

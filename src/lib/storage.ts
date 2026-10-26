@@ -82,8 +82,12 @@ export interface AnalysisSnapshot {
   eventsCalibre?: number
 }
 
-/** 当前事件解析口径版本：2 = 形状无关解析（配合深扫，见 normalizeEventsPage） */
-export const EVENTS_CALIBRE = 2
+/**
+ * 当前事件解析口径版本：
+ * 2 = 形状无关解析（配合深扫，见 normalizeEventsPage）
+ * 3 = 事件仓库路径从 project/repository/repo 等多种形状提取（修复仓库维度图表全空）
+ */
+export const EVENTS_CALIBRE = 3
 
 function isSnapshot(value: unknown): value is AnalysisSnapshot {
   if (!value || typeof value !== 'object') return false

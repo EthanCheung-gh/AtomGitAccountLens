@@ -12,6 +12,7 @@ import {
   maxDailyCommits,
   peakIndex,
   peakMonthInRange,
+  repoCommitTotals,
   pushSizeStats,
   repoMetrics,
   summarizeEvents,
@@ -58,6 +59,21 @@ export default function ReportTab() {
     () => (snapshot ? repoMetrics(snapshot.repos, snapshot.excludedRepos) : null),
     [snapshot],
   )
+
+  /**
+   * 最活跃仓库：优先用动态（events）口径；若事件的仓库字段缺失导致为空，
+   * 回退到提交级数据（深度抓取后才有），避免整块区域空白。
+   */
+  const repoTops = useMemo(() => {
+    const fromEvents = summary.byRepo
+      .slice(0, 5)
+      .map((r) => ({ repo: r.repo, commits: r.commits }))
+    if (fromEvents.length > 0) return { rows: fromEvents, source: 'events' as const }
+    const fromCommits = repoCommitTotals(snapshot?.commitsRecentByRepo, snapshot?.login)
+      .slice(0, 5)
+      .map((r) => ({ repo: r.repo, commits: r.count }))
+    return { rows: fromCommits, source: 'commits' as const }
+  }, [summary, snapshot])
 
   const langOption = useMemo<EChartsOption>(() => {
     const top = languages.slice(0, 8)
@@ -205,17 +221,29 @@ export default function ReportTab() {
               </ul>
             </div>
             <div className="card report-card">
-              <h3>区间最活跃仓库 Top 5</h3>
-              <ol className="report-top-repos">
-                {summary.byRepo.slice(0, 5).map((r) => (
-                  <li key={r.repo}>
-                    <span className="report-repo-name">{truncate(r.repo)}</span>
-                    <span className="report-repo-commits">
-                      {formatCount(r.commits)} 次提交
-                    </span>
-                  </li>
-                ))}
-              </ol>
+              <h3>
+                区间最活跃仓库 Top 5
+                {repoTops.source === 'commits' && (
+                  <span className="muted"> · 提交级口径</span>
+                )}
+              </h3>
+              {repoTops.rows.length === 0 ? (
+                <p className="muted">
+                  该区间没有仓库维度记录：事件流未提供仓库字段，且尚未做提交级深度抓取。
+                  到「活跃度」页点「深度抓取」后可在此看到仓库排名。
+                </p>
+              ) : (
+                <ol className="report-top-repos">
+                  {repoTops.rows.map((r) => (
+                    <li key={r.repo}>
+                      <span className="report-repo-name">{truncate(r.repo)}</span>
+                      <span className="report-repo-commits">
+                        {formatCount(r.commits)} 次提交
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </div>
           </div>
 

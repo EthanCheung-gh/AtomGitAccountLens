@@ -462,10 +462,16 @@ export default function ActivityTab() {
 
           <div className="card chart-card">
             <h3>最活跃仓库 Top 10（提交数）</h3>
-            <EChart
-              option={topRepoOption}
-              height={Math.max(160, summary.byRepo.slice(0, 10).length * 30 + 40)}
-            />
+            {summary.byRepo.length === 0 ? (
+              <p className="muted">
+                该区间的事件没有仓库字段，无法按仓库排名；提交级深度抓取不受影响。
+              </p>
+            ) : (
+              <EChart
+                option={topRepoOption}
+                height={Math.max(160, summary.byRepo.slice(0, 10).length * 30 + 40)}
+              />
+            )}
           </div>
         </>
       )}
