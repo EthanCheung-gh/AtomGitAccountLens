@@ -71,8 +71,8 @@ export interface AnalysisSnapshot {
   eventsByYear: Record<string, AccountEvent[]>
   /** 被排除的仓库 path（聚合时跳过） */
   excludedRepos: string[]
-  /** events 拉取失败的年份 → 原因（'scope' | 'error'） */
-  eventsUnavailable?: Record<string, 'scope' | 'error'>
+  /** events 拉取异常的年份 → 原因（'scope' 无权限 / 'error' 失败 / 'empty' 平台确认 0 条） */
+  eventsUnavailable?: Record<string, 'scope' | 'error' | 'empty'>
   /** 深度抓取：repoPath → 最近提交（可选，用户手动触发后填充） */
   commitsRecentByRepo?: Record<string, DeepCommitLite[]>
 }

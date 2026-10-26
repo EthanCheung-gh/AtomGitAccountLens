@@ -9,8 +9,8 @@
   --text: #eceff4;
   --muted: #8b939f;
   --accent: #ff5c33;
-  --accent-2: #ff997c;
-  --accent-3: #ffc9a3;
+  --accent-2: #ff8f66;
+  --accent-3: #ffb894;
   --accent-soft: rgba(255, 92, 51, 0.14);
   --accent-line: rgba(255, 92, 51, 0.42);
   --on-accent: #180a06;
@@ -278,6 +278,49 @@ body {
 .range-error {
   color: var(--danger);
   margin-left: 4px;
+}
+
+/* 区间诊断：仅在有异常年份时出现 */
+.range-diag {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.range-diag-years {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.range-year {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--muted);
+}
+
+.range-year.ready {
+  color: var(--muted);
+}
+
+.range-year.empty {
+  color: var(--warn);
+  border-color: rgba(227, 179, 65, 0.4);
+}
+
+.range-year.scope,
+.range-year.error {
+  color: var(--danger);
+  border-color: rgba(248, 81, 73, 0.4);
+}
+
+.range-year.missing {
+  color: var(--accent-2);
+  border-color: var(--accent-line);
 }
 
 /* ---------- 内容区页头 ---------- */

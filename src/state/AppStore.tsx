@@ -12,7 +12,7 @@ import { GitCodeClient, apiErrorMessage, isApiError } from '../api/client'
 import type { GitCodeUser } from '../api/types'
 import { crawlAccount, deepCrawlCommits, fetchEventsYear } from '../lib/crawler'
 import type { CrawlProgress, DeepCrawlScope } from '../lib/crawler'
-import { missingYears, presetRange } from '../lib/range'
+import { missingYears, presetRange, rangeYears } from '../lib/range'
 import type { DateRange } from '../lib/range'
 import {
   AnalysisSnapshot,
@@ -38,12 +38,14 @@ export interface EventFetchState {
   error: string | null
 }
 
-/** 区间补抓进度：缺哪几年、抓到第几年 */
+/** 区间补抓进度：缺哪几年、抓到第几年、哪些年份平台返回 0 条 */
 export interface BackfillState {
   years: number[]
   done: number
   current: number | null
   error: string | null
+  /** 抓取成功但 0 条的年份（平台确认该年无动态） */
+  empty: number[]
 }
 
 export type DeepCrawlState =
@@ -72,6 +74,8 @@ export interface AppStoreValue {
   setRange(range: DateRange): void
   /** 区间覆盖年份的自动补抓进度（无缺失为 null） */
   backfill: BackfillState | null
+  /** 强制重抓区间内的动态（清掉「平台 0 条」与空表后重抓） */
+  refreshRange(): void
   signIn(token: string, remember: boolean): Promise<GitCodeUser>
   signOut(): void
   getClient(): GitCodeClient
@@ -91,6 +95,14 @@ export interface AppStoreValue {
 }
 
 const AppStoreContext = createContext<AppStoreValue | null>(null)
+
+/** 删除对象里的某个键（保持其余内容不变） */
+function omitKey<T>(obj: Record<string, T> | undefined, key: string): Record<string, T> | undefined {
+  if (!obj || !(key in obj)) return obj
+  const next = { ...obj }
+  delete next[key]
+  return next
+}
 
 function isAbort(err: unknown): boolean {
   return (
@@ -214,31 +226,50 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setSnapshot(next)
   }, [])
 
-  /** 拉取单年事件并写入快照；已抓/已确认无权限的年份直接视为完成 */
+  /**
+   * 拉取单年事件并写入快照。
+   * 判据是「有没有数据」而不是「有没有这个键」：历史版本曾把 0 条结果写成空数组，
+   * 用真值判断会把空数组当成已抓，导致该年份永远不再重抓（区间一片空的根因）。
+   */
   const fetchYearInto = useCallback(
-    async (year: number): Promise<{ status: 'ok' | 'scope' | 'error'; message?: string }> => {
+    async (
+      year: number,
+    ): Promise<{ status: 'ok' | 'scope' | 'error'; message?: string; count: number }> => {
       const snap = snapshotRef.current
-      if (!snap || !token) return { status: 'error', message: '尚未登录' }
+      if (!snap || !token) return { status: 'error', message: '尚未登录', count: 0 }
       const key = String(year)
-      if (snap.eventsByYear[key] || snap.eventsUnavailable?.[key]) return { status: 'ok' }
+      const existing = snap.eventsByYear[key]
+      if ((existing?.length ?? 0) > 0) return { status: 'ok', count: existing!.length }
+      if (snap.eventsUnavailable?.[key]) {
+        return { status: 'ok', count: 0 }
+      }
       const outcome = await fetchEventsYear(getClient(), snap.login, year, {})
       const base = snapshotRef.current
-      if (!base) return outcome.status === 'ok' ? { status: 'ok' } : outcome
+      if (!base) return { status: outcome.status === 'ok' ? 'ok' : outcome.status, count: 0 }
       if (outcome.status === 'ok') {
+        if (outcome.events.length > 0) {
+          commitSnapshot({
+            ...base,
+            eventsByYear: { ...base.eventsByYear, [key]: outcome.events },
+            eventsUnavailable: omitKey(base.eventsUnavailable, key),
+          })
+          return { status: 'ok', count: outcome.events.length }
+        }
+        // 平台确认 0 条：单独标记，既不算缺数据也不再重复抓
         commitSnapshot({
           ...base,
-          eventsByYear: { ...base.eventsByYear, [key]: outcome.events },
+          eventsUnavailable: { ...(base.eventsUnavailable ?? {}), [key]: 'empty' },
         })
-        return { status: 'ok' }
+        return { status: 'ok', count: 0 }
       }
       if (outcome.status === 'scope') {
         commitSnapshot({
           ...base,
           eventsUnavailable: { ...(base.eventsUnavailable ?? {}), [key]: 'scope' },
         })
-        return { status: 'scope', message: outcome.message }
+        return { status: 'scope', message: outcome.message, count: 0 }
       }
-      return outcome
+      return { status: 'error', message: outcome.message, count: 0 }
     },
     [token, getClient, commitSnapshot],
   )
@@ -248,7 +279,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       const snap = snapshotRef.current
       if (!snap || !token) return
       const key = String(year)
-      if (snap.eventsByYear[key] || snap.eventsUnavailable?.[key]) return
+      if ((snap.eventsByYear[key]?.length ?? 0) > 0 || snap.eventsUnavailable?.[key]) return
       setEventFetch({ year, error: null })
       const res = await fetchYearInto(year)
       if (res.status === 'error') setEventFetch({ year, error: res.message ?? '拉取失败' })
@@ -262,12 +293,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     async (years: number[]) => {
       if (backfillingRef.current || years.length === 0) return
       backfillingRef.current = true
-      setBackfill({ years, done: 0, current: years[0], error: null })
+      const empty: number[] = []
+      setBackfill({ years, done: 0, current: years[0], error: null, empty })
       try {
         for (let i = 0; i < years.length; i++) {
           const year = years[i]
           attemptedYearsRef.current.add(year)
-          setBackfill({ years, done: i, current: year, error: null })
+          setBackfill({ years, done: i, current: year, error: null, empty })
           const res = await fetchYearInto(year)
           if (res.status === 'error') {
             setBackfill({
@@ -275,17 +307,47 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
               done: i,
               current: null,
               error: `${year} 年补抓失败：${res.message ?? '未知错误'}`,
+              empty,
             })
             return
           }
+          if (res.status === 'ok' && res.count === 0) empty.push(year)
         }
-        setBackfill({ years, done: years.length, current: null, error: null })
+        setBackfill({ years, done: years.length, current: null, error: null, empty })
       } finally {
         backfillingRef.current = false
       }
     },
     [fetchYearInto],
   )
+
+  /**
+   * 强制重抓区间内的动态：清掉空表与「平台 0 条」标记后重新抓一轮。
+   * 用于历史遗留的空快照（旧版本把 0 条写成空数组，被判为已抓而永不重抓）。
+   */
+  const refreshRange = useCallback(() => {
+    const snap = snapshotRef.current
+    if (!snap || !token || backfillingRef.current) return
+    const years = rangeYears(rangeRef.current)
+    const nextEvents = { ...snap.eventsByYear }
+    let nextUnavailable = { ...(snap.eventsUnavailable ?? {}) }
+    let changed = false
+    for (const y of years) {
+      const key = String(y)
+      if (nextEvents[key] && nextEvents[key].length === 0) {
+        delete nextEvents[key]
+        changed = true
+      }
+      if (nextUnavailable[key] === 'empty') {
+        nextUnavailable = omitKey(nextUnavailable, key) ?? {}
+        changed = true
+      }
+    }
+    if (changed) commitSnapshot({ ...snap, eventsByYear: nextEvents, eventsUnavailable: nextUnavailable })
+    attemptedYearsRef.current.clear()
+    const todo = missingYears(rangeRef.current, nextEvents, nextUnavailable)
+    if (todo.length > 0) void backfillYears(todo)
+  }, [token, commitSnapshot, backfillYears])
 
   const setRange = useCallback((next: DateRange) => {
     rangeRef.current = next
@@ -469,6 +531,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       range,
       setRange,
       backfill,
+      refreshRange,
       signIn,
       signOut,
       getClient,
@@ -495,6 +558,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       range,
       setRange,
       backfill,
+      refreshRange,
       signIn,
       signOut,
       getClient,

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { GitCodeClient } from '../api/client'
 import { ApiError } from '../api/client'
 import type { GitCodeRepo } from '../api/types'
-import { deepCrawlCommits } from './crawler'
+import { crawlAccount, deepCrawlCommits } from './crawler'
 
 function repo(partial: Partial<GitCodeRepo> & { path: string }): GitCodeRepo {
   const slash = partial.path.indexOf('/')
@@ -131,5 +131,40 @@ describe('deepCrawlCommits scope', () => {
       50 * 100, // MAX_COMMIT_PAGES_PER_REPO × 100
     )
     expect(result.truncated).toEqual(['me/huge'])
+  })
+})
+
+describe('crawlAccount 年度事件：0 条单独标记', () => {
+  const client = {
+    async getUser() {
+      return { login: 'me' }
+    },
+    async listUserRepos() {
+      return []
+    },
+    async getRepoLanguages() {
+      return {}
+    },
+    async listUserEvents(_login: string, year: number) {
+      if (year === 2025) return {} // 平台确认该年无动态
+      return {
+        '2026-03-02': [
+          {
+            action_name: 'pushed',
+            created_at: '2026-03-02T10:00:00+08:00',
+            project: { path_with_namespace: 'me/r1' },
+            push_data: { commit_count: 2 },
+          },
+        ],
+      }
+    },
+  } as unknown as GitCodeClient
+
+  it('0 条写入 eventsUnavailable.empty，而不是写成空数组', async () => {
+    const result = await crawlAccount(client, { years: [2025, 2026] })
+    expect(result.eventsByYear['2025']).toBeUndefined()
+    expect(result.eventsUnavailable['2025']).toBe('empty')
+    expect(result.eventsByYear['2026']).toHaveLength(1)
+    expect(result.eventsUnavailable['2026']).toBeUndefined()
   })
 })

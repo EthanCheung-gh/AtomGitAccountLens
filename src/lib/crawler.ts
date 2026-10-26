@@ -23,12 +23,14 @@ export interface CrawlProgress {
   message: string
 }
 
+export type EventsUnavailableKind = 'scope' | 'error' | 'empty'
+
 export interface CrawlResult {
   user: GitCodeUser
   repos: GitCodeRepo[]
   languagesByRepo: Record<string, Record<string, number>>
   eventsByYear: Record<string, AccountEvent[]>
-  eventsUnavailable: Record<string, 'scope' | 'error'>
+  eventsUnavailable: Record<string, EventsUnavailableKind>
 }
 
 const MAX_REPO_PAGES = 50 // 每页 100 → 上限 5000 仓库
@@ -156,14 +158,16 @@ export async function crawlAccount(
 
   // 4. 年度事件（scope 缺失不阻断整体）
   const eventsByYear: Record<string, AccountEvent[]> = {}
-  const eventsUnavailable: Record<string, 'scope' | 'error'> = {}
+  const eventsUnavailable: Record<string, EventsUnavailableKind> = {}
   for (const year of years) {
     const outcome = await fetchEventsYear(client, user.login, year, {
       signal,
       onProgress,
     })
     if (outcome.status === 'ok') {
-      eventsByYear[String(year)] = outcome.events
+      // 0 条不是「已抓」，而是平台确认该年无动态：单独标记，避免反复重抓和误判为缺数据
+      if (outcome.events.length > 0) eventsByYear[String(year)] = outcome.events
+      else eventsUnavailable[String(year)] = 'empty'
     } else {
       eventsUnavailable[String(year)] = outcome.status
     }

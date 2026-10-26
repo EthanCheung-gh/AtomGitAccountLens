@@ -9,6 +9,7 @@ import {
   presetRange,
   rangeYears,
   toDateKey,
+  yearStatuses,
 } from './range'
 import type { AccountEvent, DeepCommitLite } from '../api/types'
 
@@ -140,3 +141,28 @@ describe('collectEvents / collectCommits', () => {
 function ev(date: string): AccountEvent {
   return { date, action: 'push', repoPath: 'me/r1', commitCount: 1, createdAt: `${date}T10:00:00+08:00` }
 }
+
+describe('yearStatuses（区间每年诊断）', () => {
+  const r = { start: '2024-06-01', end: '2026-10-26' }
+
+  it('区分已抓 / 平台 0 条 / 无权限 / 失败 / 未抓', () => {
+    const statuses = yearStatuses(
+      r,
+      { '2024': [ev('2024-07-01')] },
+      { '2025': 'empty', '2026': 'scope' },
+    )
+    expect(statuses).toEqual([
+      { year: 2024, kind: 'ready', count: 1 },
+      { year: 2025, kind: 'empty' },
+      { year: 2026, kind: 'scope' },
+    ])
+  })
+
+  it('空数组视为未抓（历史遗留的空快照需要重抓）', () => {
+    expect(yearStatuses(r, { '2024': [], '2025': [] }, undefined)).toEqual([
+      { year: 2024, kind: 'missing' },
+      { year: 2025, kind: 'missing' },
+      { year: 2026, kind: 'missing' },
+    ])
+  })
+})

@@ -111,7 +111,7 @@ export function formatRangeLabel(range: DateRange): string {
 export function missingYears(
   range: DateRange,
   eventsByYear: Record<string, AccountEvent[]> | undefined,
-  eventsUnavailable: Record<string, 'scope' | 'error'> | undefined,
+  eventsUnavailable: Record<string, 'scope' | 'error' | 'empty'> | undefined,
 ): number[] {
   return rangeYears(range).filter((y) => {
     const key = String(y)
@@ -149,4 +149,33 @@ export function collectCommits(
     }
   }
   return out
+}
+
+/** 某年份的动态获取状态（用于区间诊断展示） */
+export type YearStatus =
+  | { year: number; kind: 'ready'; count: number }
+  | { year: number; kind: 'empty' }
+  | { year: number; kind: 'scope' }
+  | { year: number; kind: 'error' }
+  | { year: number; kind: 'missing' }
+
+/**
+ * 区间内每一年的动态状态。空数组也算「未抓」——历史版本曾把 0 条写成空表，
+ * 这样的年份需要重新抓一次才能确认。
+ */
+export function yearStatuses(
+  range: DateRange,
+  eventsByYear: Record<string, AccountEvent[]> | undefined,
+  eventsUnavailable: Record<string, 'scope' | 'error' | 'empty'> | undefined,
+): YearStatus[] {
+  return rangeYears(range).map((year) => {
+    const key = String(year)
+    const list = eventsByYear?.[key]
+    if (list && list.length > 0) return { year, kind: 'ready', count: list.length }
+    const flag = eventsUnavailable?.[key]
+    if (flag === 'scope') return { year, kind: 'scope' }
+    if (flag === 'error') return { year, kind: 'error' }
+    if (flag === 'empty') return { year, kind: 'empty' }
+    return { year, kind: 'missing' }
+  })
 }

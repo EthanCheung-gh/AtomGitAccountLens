@@ -5,18 +5,26 @@ import {
   missingYears,
   presetRange,
   toDateKey,
+  yearStatuses,
 } from '../lib/range'
 import type { RangePresetKey } from '../lib/range'
 import { useAppStore } from '../state/AppStore'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
+const STATUS_LABEL: Record<string, string> = {
+  empty: '平台返回 0 条',
+  scope: '无 read_user 权限',
+  error: '抓取失败',
+  missing: '未抓取',
+}
+
 /**
  * 时间区间选择器：任意起止日期 + 快捷预设。
  * 区间覆盖的年份若未抓取，由 store 自动补抓并在下方显示进度。
  */
 export default function RangePicker() {
-  const { range, setRange, snapshot, backfill } = useAppStore()
+  const { range, setRange, snapshot, backfill, refreshRange } = useAppStore()
 
   /** 「全部」的左端：账号创建日与已抓到的最早事件取较小者 */
   const earliest = useMemo(() => {
@@ -32,6 +40,13 @@ export default function RangePicker() {
   }, [snapshot])
 
   const today = toDateKey(new Date())
+
+  const statuses = useMemo(
+    () => yearStatuses(range, snapshot?.eventsByYear, snapshot?.eventsUnavailable),
+    [range, snapshot],
+  )
+  /** 有异常年份时才展开诊断明细（正常情况不占版面） */
+  const problems = statuses.filter((st) => st.kind !== 'ready')
 
   const missing = useMemo(
     () => missingYears(range, snapshot?.eventsByYear, snapshot?.eventsUnavailable),
@@ -124,6 +139,23 @@ export default function RangePicker() {
           </span>
         )}
       </p>
+
+      {problems.length > 0 && (
+        <div className="range-diag">
+          <span className="range-diag-years">
+            {statuses.map((st) => (
+              <span key={st.year} className={`range-year ${st.kind}`}>
+                {st.year}
+                {st.kind === 'ready' ? ` · ${(st as { count: number }).count} 条` : ''}
+                {st.kind !== 'ready' ? ` · ${STATUS_LABEL[st.kind]}` : ''}
+              </span>
+            ))}
+          </span>
+          <button type="button" className="btn" onClick={refreshRange}>
+            重新抓取区间
+          </button>
+        </div>
+      )}
     </div>
   )
 }
