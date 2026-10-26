@@ -39,6 +39,15 @@ function ev(partial: Partial<AccountEvent> & { date: string }): AccountEvent {
   return { action: 'pushed', repoPath: 'a/r', commitCount: 0, createdAt: null, ...partial }
 }
 
+/**
+ * 用本地时区构造时间再序列化：实现按「本地时间」取小时/星期，
+ * 直接写死 +08:00 会在 CI（UTC）上偏移，导致断言与环境时区耦合。
+ */
+function localIso(y: number, mo: number, d: number, h = 0, mi = 0): string {
+  return new Date(y, mo - 1, d, h, mi, 0).toISOString()
+}
+
+
 describe('actionBreakdown / actionLabel', () => {
   it('按次数降序并给出中文标签，未收录原样返回', () => {
     const stats = actionBreakdown([
@@ -58,9 +67,9 @@ describe('weekdayHourMatrix', () => {
   it('周一行=0、周日行=6，按 createdAt 计小时', () => {
     // 2026-01-05 是周一，10 点
     const m = weekdayHourMatrix([
-      ev({ date: '2026-01-05', createdAt: '2026-01-05T10:00:00+08:00' }),
-      ev({ date: '2026-01-05', createdAt: '2026-01-05T10:30:00+08:00' }),
-      ev({ date: '2026-01-11', createdAt: '2026-01-11T23:00:00+08:00' }), // 周日
+      ev({ date: '2026-01-05', createdAt: localIso(2026, 1, 5, 10, 0) }),
+      ev({ date: '2026-01-05', createdAt: localIso(2026, 1, 5, 10, 30) }),
+      ev({ date: '2026-01-11', createdAt: localIso(2026, 1, 11, 23, 0) }), // 周日
       ev({ date: '2026-01-06', createdAt: null }),
     ])
     expect(m[0][10]).toBe(2)
@@ -224,10 +233,10 @@ describe('repoMonthlyStack', () => {
 describe('deep commits helpers', () => {
   const commits: Record<string, DeepCommitLite[]> = {
     'a/r1': [
-      { sha: 'abc1234', date: '2026-02-03T09:00:00+08:00', message: 'x' },
-      { sha: 'def5678', date: '2026-02-04T23:00:00+08:00', message: 'y' },
+      { sha: 'abc1234', date: localIso(2026, 2, 3, 9, 0), message: 'x' },
+      { sha: 'def5678', date: localIso(2026, 2, 4, 23, 0), message: 'y' },
     ],
-    'a/r2': [{ sha: 'fff0000', date: '2026-02-05T09:30:00+08:00', message: 'z' }],
+    'a/r2': [{ sha: 'fff0000', date: localIso(2026, 2, 5, 9, 30), message: 'z' }],
   }
 
   it('小时直方图与总数', () => {
@@ -248,8 +257,8 @@ describe('deep commits helpers', () => {
     expect(meta).toEqual({
       total: 3,
       repos: 2,
-      first: '2026-02-03T09:00:00+08:00',
-      last: '2026-02-05T09:30:00+08:00',
+      first: localIso(2026, 2, 3, 9, 0),
+      last: localIso(2026, 2, 5, 9, 30),
     })
     expect(deepCommitMeta(undefined)).toEqual({ total: 0, repos: 0, first: null, last: null })
   })
@@ -259,13 +268,13 @@ describe('全时段提交分析（含作者过滤）', () => {
   const data: Record<string, DeepCommitLite[]> = {
     'me/r1': [
       // 2026-03-02 周一 10 点 / 14 点；2026-03-04 周三 22 点；2026-04-10 周五 09 点
-      { sha: 'aaaaaaa', date: '2026-03-02T10:00:00+08:00', message: 'feat: add x', author: 'Me' },
-      { sha: 'bbbbbbb', date: '2026-03-02T14:00:00+08:00', message: 'fix(core): crash', author: 'Me' },
-      { sha: 'ccccccc', date: '2026-03-04T22:00:00+08:00', message: 'docs: readme', author: 'other' },
-      { sha: 'ddddddd', date: '2026-04-10T09:00:00+08:00', message: '随便写写', author: 'Me' },
+      { sha: 'aaaaaaa', date: localIso(2026, 3, 2, 10, 0), message: 'feat: add x', author: 'Me' },
+      { sha: 'bbbbbbb', date: localIso(2026, 3, 2, 14, 0), message: 'fix(core): crash', author: 'Me' },
+      { sha: 'ccccccc', date: localIso(2026, 3, 4, 22, 0), message: 'docs: readme', author: 'other' },
+      { sha: 'ddddddd', date: localIso(2026, 4, 10, 9, 0), message: '随便写写', author: 'Me' },
     ],
     'me/r2': [
-      { sha: 'eeeeeee', date: '2025-12-31T23:00:00+08:00', message: 'chore: bump', author: 'Me' },
+      { sha: 'eeeeeee', date: localIso(2025, 12, 31, 23, 0), message: 'chore: bump', author: 'Me' },
     ],
   }
 
@@ -338,10 +347,10 @@ describe('全时段提交分析（含作者过滤）', () => {
 
 describe('区间月度（跨年不混月）', () => {
   const events = [
-    { date: '2025-11-05', action: 'push', repoPath: 'me/r1', commitCount: 3, createdAt: '2025-11-05T10:00:00+08:00' },
-    { date: '2026-01-04', action: 'push', repoPath: 'me/r1', commitCount: 2, createdAt: '2026-01-04T10:00:00+08:00' },
-    { date: '2026-01-09', action: 'push', repoPath: 'me/r2', commitCount: 5, createdAt: '2026-01-09T10:00:00+08:00' },
-    { date: '2026-03-01', action: 'push', repoPath: 'me/r2', commitCount: 1, createdAt: '2026-03-01T10:00:00+08:00' },
+    { date: '2025-11-05', action: 'push', repoPath: 'me/r1', commitCount: 3, createdAt: localIso(2025, 11, 5, 10, 0) },
+    { date: '2026-01-04', action: 'push', repoPath: 'me/r1', commitCount: 2, createdAt: localIso(2026, 1, 4, 10, 0) },
+    { date: '2026-01-09', action: 'push', repoPath: 'me/r2', commitCount: 5, createdAt: localIso(2026, 1, 9, 10, 0) },
+    { date: '2026-03-01', action: 'push', repoPath: 'me/r2', commitCount: 1, createdAt: localIso(2026, 3, 1, 10, 0) },
   ]
 
   it('monthKeysInRange 连续覆盖跨年月份', () => {
