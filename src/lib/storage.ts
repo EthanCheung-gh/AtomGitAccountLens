@@ -75,7 +75,15 @@ export interface AnalysisSnapshot {
   eventsUnavailable?: Record<string, 'scope' | 'error' | 'empty'>
   /** 深度抓取：repoPath → 最近提交（可选，用户手动触发后填充） */
   commitsRecentByRepo?: Record<string, DeepCommitLite[]>
+  /**
+   * 事件解析口径版本：低于当前版本时，快照里的 'empty' 标记视为不可信
+   * （旧版本把「解析不出」当成「平台无数据」），加载后会自动重抓一次。
+   */
+  eventsCalibre?: number
 }
+
+/** 当前事件解析口径版本：2 = 形状无关解析（配合深扫，见 normalizeEventsPage） */
+export const EVENTS_CALIBRE = 2
 
 function isSnapshot(value: unknown): value is AnalysisSnapshot {
   if (!value || typeof value !== 'object') return false

@@ -24,6 +24,7 @@ import {
   AnalysisSnapshot,
   clearRememberedToken,
   clearSnapshot,
+  EVENTS_CALIBRE,
   loadRange,
   loadRememberedToken,
   loadSnapshot,
@@ -189,6 +190,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           prev && prev.login === result.user.login ? prev.excludedRepos : []
         const snap: AnalysisSnapshot = {
           version: 1,
+          eventsCalibre: EVENTS_CALIBRE,
           createdAt: new Date().toISOString(),
           login: result.user.login,
           user: result.user,
@@ -512,6 +514,27 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       startCrawl()
     }
   }, [user, startCrawl])
+
+  // 迁移：旧快照的 'empty' 标记由「解析不出」写死，换新解析口径后必须重抓一次
+  useEffect(() => {
+    const snap = snapshotRef.current
+    if (!snap) return
+    if ((snap.eventsCalibre ?? 1) >= EVENTS_CALIBRE) return
+    const nextUnavailable = { ...(snap.eventsUnavailable ?? {}) }
+    let changed = false
+    for (const [key, kind] of Object.entries(nextUnavailable)) {
+      if (kind === 'empty') {
+        delete nextUnavailable[key]
+        changed = true
+      }
+    }
+    commitSnapshot({
+      ...snap,
+      eventsCalibre: EVENTS_CALIBRE,
+      eventsUnavailable: changed ? nextUnavailable : snap.eventsUnavailable,
+    })
+    attemptedYearsRef.current.clear()
+  }, [snapshot, commitSnapshot])
 
   // 区间覆盖到未抓取的年份时自动补抓（不与首轮抓取、已有补抓叠加）
   useEffect(() => {
